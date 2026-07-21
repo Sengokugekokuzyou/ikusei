@@ -177,12 +177,19 @@ selected_plan + research → ScriptWriter(§17) → TTSFormatter(§8) → Beginn
 # 1) エンジンを起動（Docker。デスクトップアプリでも可、同じAPIを :50021 で提供）
 docker run --rm -p 50021:50021 voicevox/voicevox_engine:cpu-ubuntu20.04-latest
 
-# 2) config/default.toml で voice.adapter = "voicevox"（speaker も選択）
+# 2) 話者IDを確認（好きな声を選ぶ）
+python -m ai_navigator speakers
 
-# 3) 既存レポートの音声を実音声に差し替え（尺が変わるので字幕・絵コンテも再タイミング）
-python -m ai_navigator voice  --plan reports/2026-07-21_claude-code-vs-codex/
-python -m ai_navigator video  --plan reports/2026-07-21_claude-code-vs-codex/
+# 3) 実音声に差し替え（尺が変わるので字幕・絵コンテも自動で再タイミング）
+#    config を編集せず CLI で上書き指定できる：
+python -m ai_navigator voice --plan reports/2026-07-21_.../ --adapter voicevox --speaker 3
+python -m ai_navigator video --plan reports/2026-07-21_.../
 ```
+
+`--endpoint http://HOST:50021` で別ホストのエンジンも指定可。config で恒久設定するなら
+`[voice] adapter = "voicevox"` / `speaker = N`。
+
+> **VOICEVOX を動かすマシンと同じ場所でこのコマンドを実行してください。** 別マシン（例：ホスト型セッション）からローカルの `:50021` には到達できません。
 
 > **このリポジトリのホスト実行環境（Claude Code on the web）では実音声を生成できません。** egressポリシーが許可するのはパッケージレジストリ（PyPI/npm等）のみで、VOICEVOXエンジン/Dockerイメージ/各種TTS辞書の配信元（GitHub・Docker Hub 等）は403で拒否されます。**ローカルPC等、上記が取得できる環境で上記手順を実行すれば実音声になります**（アダプタは実装・配線済み）。
 - **StoryboardBuilder**: 台本1行=1Sceneで、§25コンポーネント（VSComparison/FeatureList/ProsConsCard…）と§60カメラプリセット（cinematic_zoom/parallax_soft…）を割り当て。完全静止を作らない（§23）。§22の映像比率を自己申告し、実操作映像が目標未満なら警告。

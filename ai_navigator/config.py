@@ -53,6 +53,16 @@ class Config:
             node = node[part]
         return node
 
+    def set(self, path: str, value: Any) -> None:
+        """Override a dotted setting in place (e.g. from a CLI flag)."""
+        parts = path.split(".")
+        node = self._data
+        for part in parts[:-1]:
+            node = node.setdefault(part, {})
+            if not isinstance(node, dict):
+                raise ValueError(f"cannot set {path!r}: {part} is not a table")
+        node[parts[-1]] = value
+
     @property
     def raw(self) -> dict[str, Any]:
         return self._data

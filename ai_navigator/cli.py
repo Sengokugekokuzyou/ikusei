@@ -112,8 +112,37 @@ def _print_video_result(video, out_dir: Path) -> None:
     print(f"             {out_dir}/{video.path}")
 
 
+def _cmd_speakers(args: argparse.Namespace) -> int:
+    """List VOICEVOX speakers/styles from a running engine (to pick an id)."""
+    import json
+    import urllib.request
+    cfg = load_config()
+    endpoint = args.endpoint or cfg.get("voice.endpoint", "http://127.0.0.1:50021")
+    url = endpoint.rstrip("/") + "/speakers"
+    try:
+        with urllib.request.urlopen(url, timeout=10) as resp:
+            speakers = json.loads(resp.read())
+    except Exception as exc:
+        print(f"VOICEVOXエンジンに接続できません（{endpoint}）: {exc}", file=sys.stderr)
+        print("エンジン起動: docker run --rm -p 50021:50021 "
+              "voicevox/voicevox_engine:cpu-ubuntu20.04-latest", file=sys.stderr)
+        return 1
+    for sp in speakers:
+        name = sp.get("name", "")
+        for st in sp.get("styles", []):
+            print(f"  {st.get('id'):>4}  {name} / {st.get('name','')}")
+    return 0
+
+
 def _cmd_voice(args: argparse.Namespace) -> int:
     cfg = load_config()
+    # CLI overrides so no config edit is needed for a local VOICEVOX run.
+    if getattr(args, "adapter", None):
+        cfg.set("voice.adapter", args.adapter)
+    if getattr(args, "endpoint", None):
+        cfg.set("voice.endpoint", args.endpoint)
+    if getattr(args, "speaker", None) is not None:
+        cfg.set("voice.speaker", args.speaker)
     report_dir = Path(args.plan)
     if not (report_dir / "script_tts.json").exists():
         print(f"error: {report_dir}/script_tts.json not found. Run `script` first.", file=sys.stderr)
@@ -232,7 +261,15 @@ def build_parser() -> argparse.ArgumentParser:
 
     voice = sub.add_parser("voice", help="(Re)synthesize narration for a dir with the configured adapter")
     voice.add_argument("--plan", required=True, help="reports/YYYY-MM-DD_<slug>/ directory")
+    voice.add_argument("--adapter", default=None, choices=["mock", "voicevox"],
+                       help="Override voice.adapter (e.g. voicevox)")
+    voice.add_argument("--endpoint", default=None, help="Override VOICEVOX endpoint URL")
+    voice.add_argument("--speaker", type=int, default=None, help="Override VOICEVOX speaker/style id")
     voice.set_defaults(func=_cmd_voice)
+
+    speakers = sub.add_parser("speakers", help="List VOICEVOX speakers/styles from a running engine")
+    speakers.add_argument("--endpoint", default=None, help="VOICEVOX endpoint URL (default from config)")
+    speakers.set_defaults(func=_cmd_speakers)
 
     capture = sub.add_parser("capture", help="Record demo operation footage (Playwright) for a dir")
     capture.add_argument("--plan", required=True, help="reports/YYYY-MM-DD_<slug>/ directory")
