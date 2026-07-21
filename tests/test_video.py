@@ -19,7 +19,7 @@ from ai_navigator.pipeline import PlanPipeline
 from ai_navigator.storyboard.subtitles import wrap_jp
 from ai_navigator.video import VideoBuilder, ffmpeg_has_full_support, find_ffmpeg
 from ai_navigator.video.audio import build_narration_wav
-from ai_navigator.video.builder import _motion_vf
+from ai_navigator.video.builder import _kenburns_vf
 from ai_navigator.video.frames import build_scene_html
 from ai_navigator.schemas import ResearchReport, Scene
 
@@ -41,10 +41,10 @@ def test_wrap_jp():
     assert all(len(line) <= 20 for line in wrapped.split("\n"))
 
 
-def test_motion_vf_varies_and_sets_frames():
-    a = _motion_vf(0, 5.0, 30)
-    b = _motion_vf(1, 5.0, 30)
-    c = _motion_vf(2, 5.0, 30)
+def test_kenburns_vf_varies_and_sets_frames():
+    a = _kenburns_vf(0, 5.0, 30)
+    b = _kenburns_vf(1, 5.0, 30)
+    c = _kenburns_vf(2, 5.0, 30)
     assert "d=150" in a and "zoompan" in a
     assert a != b != c  # three distinct motions
     assert "crop=1280:720:0:0" in a  # takes the top region of the tall frame
