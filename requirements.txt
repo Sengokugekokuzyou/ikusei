@@ -5,5 +5,10 @@
 #   anthropic>=0.40      # AnthropicProvider (text/reasoning)
 #   openai>=1.40         # OpenAIProvider (text + later image generation)
 #
+# Phase 4 video rendering (free, provides a full ffmpeg binary):
+#   imageio-ffmpeg>=0.5  # H.264/AAC/subtitles ffmpeg for `ai_navigator video`
+#
+# Thumbnails and video frames use the system/bundled Chromium — no pip needed.
+#
 # Dev / test (optional):
 #   pytest>=8.0

@@ -29,5 +29,6 @@ packages = [
     "ai_navigator.voice",
     "ai_navigator.storyboard",
     "ai_navigator.thumbnail",
+    "ai_navigator.video",
     "ai_navigator.database",
 ]

@@ -16,12 +16,17 @@ AIに詳しくない人向けに「増えすぎたAIを、調べて・試して�
 # 企画のみ（Phase 1）
 python -m ai_navigator plan --topic "Claude Code vs Codex"
 
-# 企画→台本まで一気に（Phase 1 + 2）
+# 企画→台本→音声→絵コンテ→字幕→サムネ（Phase 1-3 + サムネ）
 python -m ai_navigator run --topic "Claude Code vs Codex"
 
-# 既存の企画ディレクトリから台本だけ（Phase 2）
-python -m ai_navigator script --plan reports/2026-07-21_claude-code-vs-codex/
+# さらに mp4 まで一気に（Phase 4も）
+python -m ai_navigator run --topic "Claude Code vs Codex" --video
+
+# 既存ディレクトリから mp4 だけ生成（Phase 4）
+python -m ai_navigator video --plan reports/2026-07-21_claude-code-vs-codex/
 ```
+
+> `--video` / `video` は **フルffmpeg** が必要です。無料で入ります: `pip install imageio-ffmpeg`。
 
 出力例:
 
@@ -53,6 +58,7 @@ Compare   : Claude Code vs Codex
 | `storyboard.json` | 絵コンテ（§21-24: Scene/visual_type/component/camera/params） | 3 |
 | `subtitles.json` + `captions.srt` | 字幕トラック（§28、音声タイミングに整合） | 3 |
 | `thumbnails.json` + `thumbnails/*.png` | サムネ候補3案＋選定（§61-64、Chromiumで1280×720生成） | 画像 |
+| `video.mp4` + `video.json` | 完成動画（§4-5、H.264+AAC、音声・字幕・モーション焼込み） | 4 |
 
 日付を固定したい場合: `--date 2026-07-21`。
 
@@ -104,6 +110,8 @@ ai_navigator/
 ├── voice/                   # VoiceAdapter(§7: mock/voicevox) / VoiceSynthesizer(§8)
 ├── storyboard/              # StoryboardBuilder(§21-24) / SubtitleBuilder(§28)
 ├── thumbnail/               # ThumbnailDirector(§62) / ChromiumRenderer(§54,61) / Judge(§64)
+├── video/                   # SceneFrames(§25) / Ken Burns + narration + 字幕焼込み(§4-5)
+├── htmlrender.py            # 共通 HTML→PNG（Chromium、サムネ/動画フレーム共用）
 └── database/                # AI Tool Database(§14)
 config/default.toml          # 配点・閾値・プロバイダ設定
 data/tools/*.json            # ツールDBのseed（mockの知識源）
@@ -132,6 +140,7 @@ python tests/test_planning.py     # Phase 1（pytestなしで実行可能）
 python tests/test_script.py       # Phase 2
 python tests/test_media.py        # Phase 3
 python tests/test_thumbnail.py    # サムネイル
+python tests/test_video.py        # Phase 4（ffmpeg/Chromium無ければ該当分スキップ）
 # または pytest を入れて: pytest -q
 ```
 
@@ -171,12 +180,28 @@ selected_plan + research → ScriptWriter(§17) → TTSFormatter(§8) → Beginn
 
 `config` は `[image] provider = "none"` / `[thumbnail] renderer = "chromium"`。Chromiumは自動検出（`thumbnail.chrome_path`で明示も可）。
 
+## Phase 4: 動画生成（§4-5、FFmpegベース・無料）
+
+絵コンテ＋音声＋字幕を実際の **mp4** にします。有料のRemotion/クラウドは使わず、Chromium（フレーム描画）＋フルffmpeg（エンコード）で¥0。
+
+```
+storyboard → 各Sceneをフレーム画像に描画(§25) → Ken Burnsモーション(§23/§58)
+          → narration.wav合成(§8) + 字幕焼込み(§28) → video.mp4 (H.264+AAC)
+```
+
+- **フレーム**: 各SceneをHTML/CSSでComponent風に描画→Chromiumで1280×720 PNG。
+- **モーション**: ffmpeg `zoompan` でシーンごとに zoom-in / zoom-out / pan を切替（完全静止を作らない §23）。
+- **音声**: 各ユニットWAVをタイムライン通りに連結（stdlib、§8のポーズ込み）。
+- **字幕**: `captions.srt` を `subtitles` フィルタで焼込み。日本語はスペースが無く自動改行できないため、~20字で改行。
+
+E2E「Claude Code vs Codex」→ **1280×720@30fps・1分41秒・H.264+AAC**、音声/字幕/モーション入りの `video.mp4` を生成。フルffmpegは `pip install imageio-ffmpeg` で無料導入（同梱Playwright版はwebm専用で不可）。
+
 ## ロードマップ
 
 - **Phase 1**: Research + Planner ✅
 - **Phase 2**: Script System（台本 / TTS整形 / Beginner QA / Fact QA）✅
 - **Phase 3**: Voice + Storyboard（音声合成 / 絵コンテ / 字幕）✅
-- Phase 4: 動画生成（Remotion / FFmpeg）
+- **Phase 4**: 動画生成（FFmpegベースの mp4 出力）✅ ／ Remotion高品質版は将来（Node.js）
 - Phase 5: Browser Capture（Playwright 実操作録画）
 - Phase 6: Video QA / Phase 7: YouTube / Phase 8: Analytics
 

@@ -93,8 +93,40 @@ def _cmd_script(args: argparse.Namespace) -> int:
     return 0
 
 
+def _print_video_result(video, out_dir: Path) -> None:
+    print("-" * 48)
+    if not video.ok:
+        for w in video.warnings:
+            print(f"🎞️  ⚠️  {w}")
+        return
+    flags = []
+    if video.has_audio:
+        flags.append("音声")
+    if video.has_subtitles:
+        flags.append("字幕")
+    if video.motion:
+        flags.append("モーション")
+    mm, ss = int(video.duration // 60), int(video.duration % 60)
+    print(f"🎞️  Video      : {video.path}  {video.width}x{video.height}@{video.fps}fps  "
+          f"{mm}:{ss:02d}  [{'/'.join(flags)}]")
+    print(f"             {out_dir}/{video.path}")
+
+
+def _cmd_video(args: argparse.Namespace) -> int:
+    cfg = load_config()
+    report_dir = Path(args.plan)
+    if not (report_dir / "storyboard.json").exists():
+        print(f"error: {report_dir}/storyboard.json not found. Run `script` first.", file=sys.stderr)
+        return 2
+    pipeline = PlanPipeline(cfg)
+    video = pipeline.build_video_from_dir(report_dir)
+    print(f"Report dir : {report_dir}")
+    _print_video_result(video, report_dir)
+    return 0 if video.ok else 1
+
+
 def _cmd_run(args: argparse.Namespace) -> int:
-    """plan -> (if produce) script, end to end."""
+    """plan -> (if produce) script, and optionally video, end to end."""
     cfg = load_config()
     on_date = date.fromisoformat(args.date) if args.date else None
     pipeline = PlanPipeline(cfg)
@@ -105,6 +137,9 @@ def _cmd_run(args: argparse.Namespace) -> int:
     _script, bqa, fqa, storyboard, thumbs = pipeline.run_script_from_dir(out_dir)
     _print_script_result(bqa, fqa, storyboard, out_dir)
     _print_thumbnail_result(thumbs)
+    if getattr(args, "video", False):
+        video = pipeline.build_video_from_dir(out_dir)
+        _print_video_result(video, out_dir)
     return 0
 
 
@@ -141,10 +176,15 @@ def build_parser() -> argparse.ArgumentParser:
     script.add_argument("--plan", required=True, help="reports/YYYY-MM-DD_<slug>/ directory")
     script.set_defaults(func=_cmd_script)
 
-    run = sub.add_parser("run", help="plan -> script, end to end")
+    run = sub.add_parser("run", help="plan -> script (+ --video), end to end")
     run.add_argument("--topic", required=True, help='e.g. "Claude Code vs Codex"')
     run.add_argument("--date", default=None, help="Override production date (YYYY-MM-DD)")
+    run.add_argument("--video", action="store_true", help="Also render the mp4 (Phase 4)")
     run.set_defaults(func=_cmd_run)
+
+    video = sub.add_parser("video", help="Render the mp4 from an existing script/storyboard dir")
+    video.add_argument("--plan", required=True, help="reports/YYYY-MM-DD_<slug>/ directory")
+    video.set_defaults(func=_cmd_video)
 
     return parser
 

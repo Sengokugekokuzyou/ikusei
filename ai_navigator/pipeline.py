@@ -29,17 +29,22 @@ from .script import BeginnerQA, FactQA, ScriptWriter, TTSFormatter
 from .storyboard import StoryboardBuilder, SubtitleBuilder, to_srt
 from .voice import VoiceSynthesizer, build_adapter
 from .thumbnail import ChromiumThumbnailRenderer, ThumbnailDirector, ThumbnailJudge
+from .video import VideoBuilder
 from .schemas import (
     BeginnerQAReport,
     FactQAReport,
     Finding,
     ResearchReport,
+    Scene,
     Script,
     SelectedPlan,
     Storyboard,
     ThumbnailCandidate,
     ThumbnailSet,
     Verdict,
+    VideoResult,
+    VoiceClip,
+    VoiceManifest,
     to_json,
 )
 
@@ -187,6 +192,14 @@ class PlanPipeline:
         self._write(report_dir / "thumbnails.json", thumbnails)
         return script, bqa, fqa, storyboard, thumbnails
 
+    # --- Phase 4: Video (§4-5) — free FFmpeg render -----------------------
+    def build_video_from_dir(self, report_dir: Path) -> VideoResult:
+        storyboard = _load_storyboard(report_dir / "storyboard.json")
+        voice = _load_voice(report_dir / "voice.json")
+        result = VideoBuilder(self._cfg).run(storyboard, voice, report_dir)
+        self._write(report_dir / "video.json", result)
+        return result
+
     @staticmethod
     def _write(path: Path, obj) -> None:
         path.write_text(to_json(obj) + "\n", encoding="utf-8")
@@ -200,6 +213,44 @@ def _load_plan(path: Path) -> SelectedPlan:
     d = json.loads(path.read_text(encoding="utf-8"))
     d["verdict"] = Verdict(d.get("verdict", "discard"))
     return SelectedPlan(**d)
+
+
+def _load_storyboard(path: Path) -> Storyboard:
+    d = json.loads(path.read_text(encoding="utf-8"))
+    scenes = [
+        Scene(
+            scene_id=s.get("scene_id", i + 1), section=s.get("section", ""),
+            duration=s.get("duration", 0.0), voice=s.get("voice", ""),
+            visual_type=s.get("visual_type", ""), component=s.get("component", ""),
+            params=dict(s.get("params", {})), animation=s.get("animation", ""),
+            camera=s.get("camera", ""), start=s.get("start", 0.0),
+        )
+        for i, s in enumerate(d.get("scenes", []))
+    ]
+    return Storyboard(
+        topic=d.get("topic", ""), produced_at=d.get("produced_at", ""),
+        working_title=d.get("working_title", ""),
+        total_duration=d.get("total_duration", 0.0), scenes=scenes,
+        visual_mix=dict(d.get("visual_mix", {})), warnings=list(d.get("warnings", [])),
+    )
+
+
+def _load_voice(path: Path) -> VoiceManifest:
+    d = json.loads(path.read_text(encoding="utf-8"))
+    clips = [
+        VoiceClip(
+            id=c.get("id", 0), section=c.get("section", ""), line=c.get("line", 0),
+            text=c.get("text", ""), start=c.get("start", 0.0), end=c.get("end", 0.0),
+            duration=c.get("duration", 0.0), pause_after=c.get("pause_after", 0.0),
+            audio_path=c.get("audio_path", ""),
+        )
+        for c in d.get("clips", [])
+    ]
+    return VoiceManifest(
+        topic=d.get("topic", ""), produced_at=d.get("produced_at", ""),
+        adapter=d.get("adapter", "mock"), total_duration=d.get("total_duration", 0.0),
+        clips=clips,
+    )
 
 
 def _load_research(path: Path) -> ResearchReport:

@@ -18,11 +18,31 @@ def _fmt_ts(seconds: float) -> str:
     return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
 
 
+def wrap_jp(text: str, max_chars: int = 20) -> str:
+    """Wrap Japanese (space-less) text into lines so it fits the frame width.
+
+    libass cannot auto-wrap text without break opportunities, so we insert
+    line breaks — preferring to break just after punctuation.
+    """
+    text = text.strip()
+    if len(text) <= max_chars:
+        return text
+    lines, cur = [], ""
+    for ch in text:
+        cur += ch
+        if len(cur) >= max_chars or (ch in "、。！？" and len(cur) >= max_chars - 6):
+            lines.append(cur)
+            cur = ""
+    if cur:
+        lines.append(cur)
+    return "\n".join(lines)
+
+
 def to_srt(track: SubtitleTrack) -> str:
     blocks = []
     for sub in track.subtitles:
         blocks.append(
-            f"{sub.index}\n{_fmt_ts(sub.start)} --> {_fmt_ts(sub.end)}\n{sub.text}"
+            f"{sub.index}\n{_fmt_ts(sub.start)} --> {_fmt_ts(sub.end)}\n{wrap_jp(sub.text)}"
         )
     return "\n\n".join(blocks) + "\n"
 

@@ -62,6 +62,7 @@ from .storyboard import (  # noqa: E402
     SubtitleTrack,
 )
 from .thumbnail import ThumbnailSpec, ThumbnailCandidate, ThumbnailSet  # noqa: E402
+from .video import VideoResult  # noqa: E402
 
 __all__ = [
     "to_dict",
@@ -102,4 +103,5 @@ __all__ = [
     "ThumbnailSpec",
     "ThumbnailCandidate",
     "ThumbnailSet",
+    "VideoResult",
 ]

@@ -68,6 +68,15 @@ chrome_path = ""
 # Spec §64/§69: generate at least 3 candidates.
 candidates = 3
 
+[video]
+# Phase 4 renders an mp4 from the storyboard frames + narration + subtitles
+# using a full ffmpeg. `pip install imageio-ffmpeg` provides one for free.
+fps = 30
+# Ken Burns camera motion so nothing is fully static (§23/§58).
+motion = true
+# Leave blank to auto-detect ffmpeg (imageio-ffmpeg, then PATH).
+ffmpeg_path = ""
+
 [paths]
 reports_dir = "reports"
 tools_db_dir = "data/tools"
