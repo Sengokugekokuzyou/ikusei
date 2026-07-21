@@ -134,6 +134,71 @@ def _cmd_speakers(args: argparse.Namespace) -> int:
     return 0
 
 
+# Easy-to-listen candidates for a beginner explainer channel (matched by name
+# against the running engine, so it works regardless of exact id numbering).
+_SAMPLE_CANDIDATES = ["四国めたん", "九州そら", "春日部つむぎ", "玄野武宏", "No.7", "青山龍星", "ずんだもん"]
+_SAMPLE_TEXT = (
+    "こんにちは。今日は初心者向けに、AIの選び方を解説します。"
+    "Claude CodeとCodex、結局どっちを使えばいいのか、一緒に見ていきましょう。"
+)
+
+
+def _pick_style(sp: dict) -> dict | None:
+    styles = sp.get("styles", [])
+    for st in styles:
+        if "ノーマル" in st.get("name", ""):
+            return st
+    return styles[0] if styles else None
+
+
+def _cmd_voice_sample(args: argparse.Namespace) -> int:
+    """Synthesize one sample line with several listenable voices to compare."""
+    import json
+    import urllib.request
+    from pathlib import Path
+
+    cfg = load_config()
+    endpoint = args.endpoint or cfg.get("voice.endpoint", "http://127.0.0.1:50021")
+    text = args.text or _SAMPLE_TEXT
+    try:
+        with urllib.request.urlopen(endpoint.rstrip("/") + "/speakers", timeout=10) as resp:
+            speakers = json.loads(resp.read())
+    except Exception as exc:
+        print(f"VOICEVOXエンジンに接続できません（{endpoint}）: {exc}", file=sys.stderr)
+        print("VOICEVOX（デスクトップ版）を起動してから、もう一度実行してください。", file=sys.stderr)
+        return 1
+
+    by_name = {sp.get("name", ""): sp for sp in speakers}
+    from .voice.voicevox import VoicevoxAdapter
+    out_dir = Path("voice_samples")
+    out_dir.mkdir(exist_ok=True)
+    print(f"サンプル文: {text}\n{'-' * 48}")
+    made = 0
+    for name in _SAMPLE_CANDIDATES:
+        sp = by_name.get(name)
+        if not sp:
+            continue
+        style = _pick_style(sp)
+        if not style:
+            continue
+        sid = int(style["id"])
+        fname = f"{sid:02d}_{name}_{style.get('name','')}.wav"
+        try:
+            VoicevoxAdapter(endpoint=endpoint, speaker=sid).synthesize(
+                text, speed=1.03, out_path=out_dir / fname
+            )
+            print(f"  ✅ id={sid:>3}  {name} / {style.get('name','')}")
+            made += 1
+        except Exception as exc:  # noqa: BLE001
+            print(f"  ⚠️  {name}: {exc}", file=sys.stderr)
+    print("-" * 48)
+    print(f"{made}個のサンプルを voice_samples/ に作成しました。")
+    print("再生して好きな声を選び、その id を make_video.bat の SPEAKER に設定してください。")
+    if getattr(args, "open", False) and made:
+        _open_file(out_dir)
+    return 0
+
+
 def _cmd_voice(args: argparse.Namespace) -> int:
     cfg = load_config()
     # CLI overrides so no config edit is needed for a local VOICEVOX run.
@@ -339,6 +404,12 @@ def build_parser() -> argparse.ArgumentParser:
     speakers = sub.add_parser("speakers", help="List VOICEVOX speakers/styles from a running engine")
     speakers.add_argument("--endpoint", default=None, help="VOICEVOX endpoint URL (default from config)")
     speakers.set_defaults(func=_cmd_speakers)
+
+    vsample = sub.add_parser("voice-sample", help="Synthesize a sample line with several voices to compare")
+    vsample.add_argument("--endpoint", default=None, help="VOICEVOX endpoint URL (default from config)")
+    vsample.add_argument("--text", default=None, help="Custom sample text")
+    vsample.add_argument("--open", action="store_true", help="Open the voice_samples folder when done")
+    vsample.set_defaults(func=_cmd_voice_sample)
 
     images = sub.add_parser("images", help="Fetch/assign B-roll photos for a dir (§48)")
     images.add_argument("--plan", required=True, help="reports/YYYY-MM-DD_<slug>/ directory")

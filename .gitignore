@@ -20,6 +20,9 @@ venv/
 /assets/*
 !/assets/README.md
 
+# Generated voice comparison samples
+/voice_samples/
+
 # OS / editor
 .DS_Store
 *.swp

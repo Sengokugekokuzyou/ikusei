@@ -9,9 +9,9 @@ setlocal EnableDelayedExpansion
 cd /d "%~dp0.."
 
 rem ==== VOICE ====  Change this number to pick the VOICEVOX voice.
-rem   13 = Aoyama Ryusei (normal)   3 = Zundamon (normal)
-rem   See all ids: py -m ai_navigator speakers   (with VOICEVOX running)
-set "SPEAKER=13"
+rem   2 = Shikoku Metan (normal)   13 = Aoyama Ryusei   3 = Zundamon
+rem   Compare voices: double-click sample_voices.bat (VOICEVOX running)
+set "SPEAKER=2"
 
 echo ============================================
 echo    AI Navigator - make video (Windows)
