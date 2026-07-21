@@ -2,7 +2,7 @@
 
 AIに詳しくない人向けに「増えすぎたAIを、調べて・試して・比較して "あなたはこれを使えばいい" と答える」YouTube動画を、可能な限り自動で制作・改善するためのシステムです。
 
-このリポジトリは **Phase 1（Research + Planner）＋ Phase 2（Script System）** の実装です。1つのトピックを入力すると、調査 → ファクトチェック → 企画10案 → ダメ出し → 採点 → 判定 → 台本 → TTS整形 → 初心者QA → ファクトQA までを自動で行い、人間がレビューできる形でレポートを出力します。
+このリポジトリは **Phase 1〜3** の実装です。1つのトピックを入力すると、調査 → ファクトチェック → 企画10案 → ダメ出し → 採点 → 判定 → 台本 → TTS整形 → 初心者QA → ファクトQA → 音声合成 → 絵コンテ → 字幕 までを自動で行い、人間がレビューできる形でレポートを出力します。
 
 > 設計思想（仕様書 §43/§45）: 目的は動画の量産ではなく、初心者に本当に役立つ解説を高品質で作ること。**基準未満なら投稿しない。**
 
@@ -49,6 +49,9 @@ Compare   : Claude Code vs Codex
 | `script_tts.json` | TTS用の音声ユニット（§8: speed/pause/emphasis…） | 2 |
 | `beginner_qa.json` | 初心者QA（§20: 用語/一文長/料金/結論… 0-100, <80再生成） | 2 |
 | `fact_qa.json` | ファクトQA（各claimの根拠照合, 無根拠断定をflag） | 2 |
+| `voice.json` + `voice/*.wav` | 音声合成マニフェスト＋クリップ（§7/§8、mockは無音WAV） | 3 |
+| `storyboard.json` | 絵コンテ（§21-24: Scene/visual_type/component/camera/params） | 3 |
+| `subtitles.json` + `captions.srt` | 字幕トラック（§28、音声タイミングに整合） | 3 |
 
 日付を固定したい場合: `--date 2026-07-21`。
 
@@ -97,6 +100,8 @@ ai_navigator/
 ├── research/                # Researcher(§12) / FactChecker(§13) / BeginnerTranslator(§19)
 ├── planner/                 # IdeaGenerator(§9) / Critic(§10) / Scorer(§11) / Judge(§11)
 ├── script/                  # ScriptWriter(§17) / TTSFormatter(§8) / BeginnerQA(§20) / FactQA(§13)
+├── voice/                   # VoiceAdapter(§7: mock/voicevox) / VoiceSynthesizer(§8)
+├── storyboard/              # StoryboardBuilder(§21-24) / SubtitleBuilder(§28)
 └── database/                # AI Tool Database(§14)
 config/default.toml          # 配点・閾値・プロバイダ設定
 data/tools/*.json            # ツールDBのseed（mockの知識源）
@@ -123,6 +128,7 @@ tests/                       # Phase 1 テスト
 ```bash
 python tests/test_planning.py     # Phase 1（pytestなしで実行可能）
 python tests/test_script.py       # Phase 2
+python tests/test_media.py        # Phase 3
 # または pytest を入れて: pytest -q
 ```
 
@@ -143,11 +149,21 @@ selected_plan + research → ScriptWriter(§17) → TTSFormatter(§8) → Beginn
 - **BeginnerQA**: 用語説明/一文長/具体例/料金/使い始め方/結論明確 を採点（0-100）。80未満は再生成（最大3回）。
 - **FactQA**: `is_claim` の行を research/ツールDBと照合し、根拠不明の断定を flag（§17「公式確認なしの断定」禁止）。
 
+## Phase 3: Voice + Storyboard（§7/§8/§21-24/§28）
+
+台本を音声タイムラインに載せ、絵コンテと字幕を導出します。LLM層と同じく**アダプタ方式**で、VOICEVOXエンジンが無くても動きます。
+
+- **VoiceSynthesizer**: 各音声ユニットをアダプタで合成し、単一タイムラインに配置（§8のポーズ込み）。`mock`アダプタは推定尺の**無音WAVを実ファイル出力**するのでオフラインで完結、FFmpeg/Remotionの実入力になる。`voicevox`アダプタは稼働中エンジンにHTTP接続（`VOICEVOX_ENDPOINT`）。
+- **StoryboardBuilder**: 台本1行=1Sceneで、§25コンポーネント（VSComparison/FeatureList/ProsConsCard…）と§60カメラプリセット（cinematic_zoom/parallax_soft…）を割り当て。完全静止を作らない（§23）。§22の映像比率を自己申告し、実操作映像が目標未満なら警告。
+- **SubtitleBuilder**: 音声タイミングに整合した字幕を生成（重要語をemphasisで保持、§28）。SRTも出力。
+
+> mockは実操作映像を持たないため、§22の「実操作35〜45%」は必ず未達警告になります（正しい挙動）。実収録は Phase 5（Playwright）で補います。
+
 ## ロードマップ
 
 - **Phase 1**: Research + Planner ✅
 - **Phase 2**: Script System（台本 / TTS整形 / Beginner QA / Fact QA）✅
-- Phase 3: Voice + Storyboard（VOICEVOX / 字幕タイムコード / Scene分割）
+- **Phase 3**: Voice + Storyboard（音声合成 / 絵コンテ / 字幕）✅
 - Phase 4: 動画生成（Remotion / FFmpeg）
 - Phase 5: Browser Capture（Playwright 実操作録画）
 - Phase 6: Video QA / Phase 7: YouTube / Phase 8: Analytics

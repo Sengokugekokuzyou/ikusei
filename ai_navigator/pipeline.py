@@ -14,6 +14,7 @@ and writes the six report artifacts a human reviews before Phase 2:
 from __future__ import annotations
 
 import json
+import os
 import re
 import unicodedata
 from datetime import date
@@ -25,6 +26,8 @@ from .llm import build_provider
 from .planner import Critic, IdeaGenerator, Judge, Scorer
 from .research import BeginnerTranslator, FactChecker, Researcher, extract_tools
 from .script import BeginnerQA, FactQA, ScriptWriter, TTSFormatter
+from .storyboard import StoryboardBuilder, SubtitleBuilder, to_srt
+from .voice import VoiceSynthesizer, build_adapter
 from .schemas import (
     BeginnerQAReport,
     FactQAReport,
@@ -32,6 +35,7 @@ from .schemas import (
     ResearchReport,
     Script,
     SelectedPlan,
+    Storyboard,
     Verdict,
     to_json,
 )
@@ -122,7 +126,21 @@ class PlanPipeline:
         tts = formatter.run(script)
         return script, bqa, fqa, tts
 
-    def run_script_from_dir(self, report_dir: Path) -> tuple[Script, BeginnerQAReport, FactQAReport]:
+    # --- Phase 3: Voice + Storyboard (§7/§8/§21-24/§28) --------------------
+    def build_media(self, script: Script, tts, out_dir: Path) -> tuple[object, Storyboard, object]:
+        adapter = build_adapter(
+            self._cfg.get("voice.adapter", "mock"),
+            sample_rate=self._cfg.get("voice.sample_rate", 24000),
+            endpoint=os.environ.get("VOICEVOX_ENDPOINT", self._cfg.get("voice.endpoint", "")),
+        )
+        voice = VoiceSynthesizer(adapter).run(tts, out_dir)
+        storyboard = StoryboardBuilder().run(script, voice)
+        subtitles = SubtitleBuilder().run(tts, voice)
+        return voice, storyboard, subtitles
+
+    def run_script_from_dir(
+        self, report_dir: Path
+    ) -> tuple[Script, BeginnerQAReport, FactQAReport, Storyboard]:
         plan = _load_plan(report_dir / "selected_plan.json")
         research = _load_research(report_dir / "research.json")
         script, bqa, fqa, tts = self.build_script(plan, research)
@@ -130,7 +148,14 @@ class PlanPipeline:
         self._write(report_dir / "script_tts.json", tts)
         self._write(report_dir / "beginner_qa.json", bqa)
         self._write(report_dir / "fact_qa.json", fqa)
-        return script, bqa, fqa
+
+        # Phase 3: voice + storyboard + subtitles.
+        voice, storyboard, subtitles = self.build_media(script, tts, report_dir)
+        self._write(report_dir / "voice.json", voice)
+        self._write(report_dir / "storyboard.json", storyboard)
+        self._write(report_dir / "subtitles.json", subtitles)
+        (report_dir / "captions.srt").write_text(to_srt(subtitles), encoding="utf-8")
+        return script, bqa, fqa, storyboard
 
     @staticmethod
     def _write(path: Path, obj) -> None:

@@ -78,6 +78,7 @@ class AudioUnit:
     id: int
     section: str
     text: str
+    line: int = 0  # global script-line index this unit came from
     speaker: str = "default"
     speed: float = 1.0
     pause_after: float = 0.3

@@ -45,7 +45,7 @@ def _cmd_plan(args: argparse.Namespace) -> int:
     return 0
 
 
-def _print_script_result(bqa, fqa, out_dir: Path) -> None:
+def _print_script_result(bqa, fqa, storyboard, out_dir: Path) -> None:
     print("-" * 48)
     b = "✅" if bqa.passed else "🛑"
     f = "✅" if fqa.passed else "🛑"
@@ -55,7 +55,15 @@ def _print_script_result(bqa, fqa, out_dir: Path) -> None:
         print("Issues:")
         for iss in (bqa.issues + fqa.issues):
             print(f"  [{iss.severity}] {iss.check}: {iss.detail}")
-    print(f"Script      : {out_dir}/script.json (+ script_tts.json)")
+    print("-" * 48)
+    mm = int(storyboard.total_duration // 60)
+    ss = int(storyboard.total_duration % 60)
+    print(f"🎬 Storyboard : {len(storyboard.scenes)} scenes, 尺 {mm}:{ss:02d}")
+    mix = ", ".join(f"{k} {v:.0%}" for k, v in sorted(storyboard.visual_mix.items()))
+    print(f"Visual mix  : {mix}")
+    for w in storyboard.warnings:
+        print(f"  ⚠️  {w}")
+    print(f"Artifacts   : {out_dir}/ (script/storyboard/subtitles.json, captions.srt, voice/*.wav)")
 
 
 def _cmd_script(args: argparse.Namespace) -> int:
@@ -65,9 +73,9 @@ def _cmd_script(args: argparse.Namespace) -> int:
         print(f"error: {report_dir}/selected_plan.json not found. Run `plan` first.", file=sys.stderr)
         return 2
     pipeline = PlanPipeline(cfg)
-    _script, bqa, fqa = pipeline.run_script_from_dir(report_dir)
+    _script, bqa, fqa, storyboard = pipeline.run_script_from_dir(report_dir)
     print(f"Report dir : {report_dir}")
-    _print_script_result(bqa, fqa, report_dir)
+    _print_script_result(bqa, fqa, storyboard, report_dir)
     return 0
 
 
@@ -80,8 +88,8 @@ def _cmd_run(args: argparse.Namespace) -> int:
     _cmd_plan_print(plan, out_dir, cfg)
     if not plan.produce:
         return 0
-    _script, bqa, fqa = pipeline.run_script_from_dir(out_dir)
-    _print_script_result(bqa, fqa, out_dir)
+    _script, bqa, fqa, storyboard = pipeline.run_script_from_dir(out_dir)
+    _print_script_result(bqa, fqa, storyboard, out_dir)
     return 0
 
 

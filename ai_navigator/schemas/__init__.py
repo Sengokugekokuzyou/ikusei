@@ -53,6 +53,14 @@ from .script import (  # noqa: E402
     SECTION_LABELS,
 )
 from .qa import BeginnerQAReport, FactQAReport, QAIssue  # noqa: E402
+from .storyboard import (  # noqa: E402
+    VoiceClip,
+    VoiceManifest,
+    Scene,
+    Storyboard,
+    Subtitle,
+    SubtitleTrack,
+)
 
 __all__ = [
     "to_dict",
@@ -84,4 +92,10 @@ __all__ = [
     "BeginnerQAReport",
     "FactQAReport",
     "QAIssue",
+    "VoiceClip",
+    "VoiceManifest",
+    "Scene",
+    "Storyboard",
+    "Subtitle",
+    "SubtitleTrack",
 ]

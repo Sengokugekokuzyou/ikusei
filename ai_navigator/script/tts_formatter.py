@@ -26,10 +26,12 @@ class TTSFormatter:
     def run(self, script: Script) -> TTSScript:
         units: list[AudioUnit] = []
         uid = 0
+        line_idx = -1
         tools = script.comparison_targets
         for sec in script.sections:
             last_line = len(sec.lines) - 1
             for li, line in enumerate(sec.lines):
+                line_idx += 1
                 sentences = split_sentences(line.text)
                 for si, sentence in enumerate(sentences):
                     uid += 1
@@ -44,6 +46,7 @@ class TTSFormatter:
                             id=uid,
                             section=sec.section,
                             text=sentence,
+                            line=line_idx,
                             speaker="default",
                             speed=self._speed,
                             pause_after=0.6 if end_of_section else 0.35,
