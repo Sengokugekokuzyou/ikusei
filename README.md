@@ -111,6 +111,7 @@ ai_navigator/
 ├── storyboard/              # StoryboardBuilder(§21-24) / SubtitleBuilder(§28)
 ├── thumbnail/               # ThumbnailDirector(§62) / ChromiumRenderer(§54,61) / Judge(§64)
 ├── video/                   # SceneFrames(§25) / Ken Burns + narration + 字幕焼込み(§4-5)
+├── capture/                 # Playwright録画 + カーソル合成(§5-6) / §49準拠デモ
 ├── htmlrender.py            # 共通 HTML→PNG（Chromium、サムネ/動画フレーム共用）
 └── database/                # AI Tool Database(§14)
 config/default.toml          # 配点・閾値・プロバイダ設定
@@ -141,6 +142,7 @@ python tests/test_script.py       # Phase 2
 python tests/test_media.py        # Phase 3
 python tests/test_thumbnail.py    # サムネイル
 python tests/test_video.py        # Phase 4（ffmpeg/Chromium無ければ該当分スキップ）
+python tests/test_capture.py      # Phase 5（Playwright無ければ該当分スキップ）
 # または pytest を入れて: pytest -q
 ```
 
@@ -213,13 +215,27 @@ storyboard → 各Sceneをフレーム画像に描画(§25) → Ken Burnsモー�
 
 E2E「Claude Code vs Codex」→ **1280×720@30fps・1分41秒・H.264+AAC**、音声/字幕/モーション入りの `video.mp4` を生成。フルffmpegは `pip install imageio-ffmpeg` で無料導入（同梱Playwright版はwebm専用で不可）。
 
+## Phase 5: 実操作録画（§5-6、Playwright・無料）
+
+`real_demo` シーンを、**実際の画面操作の録画**に差し替えます（§22の実操作映像、§70優先度1）。
+
+```bash
+python -m ai_navigator capture --plan reports/2026-07-21_.../   # 録画→mp4化
+python -m ai_navigator video   --plan reports/2026-07-21_.../   # 該当シーンに合成
+```
+
+- **CaptureRecorder**: 同梱ChromiumをPlaywrightで駆動し、ページ操作（プロンプト入力→実行クリック→結果表示）を録画。ヘッドレスにはカーソルが無いので、**カーソルのドット＋クリック時のリップル**をJSで注入（§5 cursor highlight）。webm→1280×720 H.264 mp4に変換し、`real_demo`シーンへナレーション尺に合わせて合成。
+- **§49 厳守**: 同梱デモは「収録デモ（プレースホルダ）— 実在サービスの画面ではありません」と明示したローカルページを録画します。**架空UIを実サービスに見せかけません**。
+
+> **実在AIサービス（Claude Code / Codex / ChatGPT 等）の操作録画は、各自のログイン済みローカル環境で recipe を差し替えて行ってください。** このホスト環境ではegressポリシーで外部サイトが403、かつログイン/規約(§6)の制約があるため、実サービスは録画できません（フレームワークは実装済み）。
+
 ## ロードマップ
 
 - **Phase 1**: Research + Planner ✅
 - **Phase 2**: Script System（台本 / TTS整形 / Beginner QA / Fact QA）✅
 - **Phase 3**: Voice + Storyboard（音声合成 / 絵コンテ / 字幕）✅
 - **Phase 4**: 動画生成（FFmpegベースの mp4 出力）✅ ／ Remotion高品質版は将来（Node.js）
-- Phase 5: Browser Capture（Playwright 実操作録画）
+- **Phase 5**: Browser Capture（Playwright 実操作録画 → real_demoシーンに合成）✅
 - Phase 6: Video QA / Phase 7: YouTube / Phase 8: Analytics
 
 詳細は仕様書 §39 を参照。

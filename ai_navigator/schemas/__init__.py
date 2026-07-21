@@ -63,6 +63,12 @@ from .storyboard import (  # noqa: E402
 )
 from .thumbnail import ThumbnailSpec, ThumbnailCandidate, ThumbnailSet  # noqa: E402
 from .video import VideoResult  # noqa: E402
+from .capture import (  # noqa: E402
+    CaptureAction,
+    CaptureRecipe,
+    CaptureAsset,
+    CaptureManifest,
+)
 
 __all__ = [
     "to_dict",
@@ -104,4 +110,8 @@ __all__ = [
     "ThumbnailCandidate",
     "ThumbnailSet",
     "VideoResult",
+    "CaptureAction",
+    "CaptureRecipe",
+    "CaptureAsset",
+    "CaptureManifest",
 ]

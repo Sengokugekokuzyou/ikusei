@@ -136,6 +136,30 @@ def _cmd_voice(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_capture(args: argparse.Namespace) -> int:
+    from datetime import datetime
+    cfg = load_config()
+    report_dir = Path(args.plan)
+    if not (report_dir / "storyboard.json").exists():
+        print(f"error: {report_dir}/storyboard.json not found. Run `script` first.", file=sys.stderr)
+        return 2
+    pipeline = PlanPipeline(cfg)
+    created = datetime.now().isoformat(timespec="seconds")
+    manifest = pipeline.build_capture_from_dir(report_dir, created)
+    print(f"Report dir : {report_dir}")
+    print("-" * 48)
+    if manifest.assets:
+        for a in manifest.assets:
+            tag = "実サービス" if a.is_real_service else "プレースホルダ"
+            print(f"🎥 Capture    : {a.video_path}  {a.duration:.1f}s  scene#{a.scene_id}  [{tag}]")
+    else:
+        print("🎥 Capture    : （収録なし）")
+    for w in manifest.warnings:
+        print(f"   ⚠️  {w}")
+    print("   → `video --plan` で該当シーンに実映像が合成されます。")
+    return 0
+
+
 def _cmd_video(args: argparse.Namespace) -> int:
     cfg = load_config()
     report_dir = Path(args.plan)
@@ -209,6 +233,10 @@ def build_parser() -> argparse.ArgumentParser:
     voice = sub.add_parser("voice", help="(Re)synthesize narration for a dir with the configured adapter")
     voice.add_argument("--plan", required=True, help="reports/YYYY-MM-DD_<slug>/ directory")
     voice.set_defaults(func=_cmd_voice)
+
+    capture = sub.add_parser("capture", help="Record demo operation footage (Playwright) for a dir")
+    capture.add_argument("--plan", required=True, help="reports/YYYY-MM-DD_<slug>/ directory")
+    capture.set_defaults(func=_cmd_capture)
 
     video = sub.add_parser("video", help="Render the mp4 from an existing script/storyboard dir")
     video.add_argument("--plan", required=True, help="reports/YYYY-MM-DD_<slug>/ directory")

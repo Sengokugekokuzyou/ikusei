@@ -30,6 +30,7 @@ from .storyboard import StoryboardBuilder, SubtitleBuilder, to_srt
 from .voice import VoiceSynthesizer, build_adapter
 from .thumbnail import ChromiumThumbnailRenderer, ThumbnailDirector, ThumbnailJudge
 from .video import VideoBuilder
+from .capture import CaptureRecorder, placeholder_recipe
 from .schemas import (
     BeginnerQAReport,
     FactQAReport,
@@ -49,6 +50,7 @@ from .schemas import (
     VideoResult,
     VoiceClip,
     VoiceManifest,
+    CaptureManifest,
     to_json,
 )
 
@@ -212,11 +214,41 @@ class PlanPipeline:
         self._write_media(report_dir, voice, storyboard, subtitles)
         return voice
 
+    # --- Phase 5: Browser capture (§5-6) — Playwright recording -----------
+    def build_capture_from_dir(self, report_dir: Path, created_at: str) -> CaptureManifest:
+        storyboard = _load_storyboard(report_dir / "storyboard.json")
+        demo_scenes = [s.scene_id for s in storyboard.scenes if s.section == "real_demo"]
+        manifest = CaptureManifest(topic=storyboard.topic, produced_at=storyboard.produced_at)
+        recorder = CaptureRecorder(
+            chrome_path=self._cfg.get("thumbnail.chrome_path", ""),
+            ffmpeg_path=self._cfg.get("video.ffmpeg_path", ""),
+        )
+        ok, reason = recorder.available()
+        if not ok:
+            manifest.warnings.append(reason)
+            self._write(report_dir / "capture.json", manifest)
+            return manifest
+        if not demo_scenes:
+            manifest.warnings.append("storyboardにreal_demoシーンがありません。")
+            self._write(report_dir / "capture.json", manifest)
+            return manifest
+        # Record the safe placeholder demo attached to the first real_demo scene.
+        recipe = placeholder_recipe(report_dir, scene_id=demo_scenes[0])
+        asset = recorder.record(recipe, report_dir, created_at)
+        manifest.assets.append(asset)
+        manifest.warnings.append(
+            "これは§49準拠のプレースホルダ収録です。実サービスの操作映像は、"
+            "各自のログイン済みローカル環境で recipe を差し替えて収録してください。"
+        )
+        self._write(report_dir / "capture.json", manifest)
+        return manifest
+
     # --- Phase 4: Video (§4-5) — free FFmpeg render -----------------------
     def build_video_from_dir(self, report_dir: Path) -> VideoResult:
         storyboard = _load_storyboard(report_dir / "storyboard.json")
         voice = _load_voice(report_dir / "voice.json")
-        result = VideoBuilder(self._cfg).run(storyboard, voice, report_dir)
+        captures = _load_captures(report_dir / "capture.json")
+        result = VideoBuilder(self._cfg).run(storyboard, voice, report_dir, captures=captures)
         self._write(report_dir / "video.json", result)
         return result
 
@@ -308,6 +340,18 @@ def _load_voice(path: Path) -> VoiceManifest:
         adapter=d.get("adapter", "mock"), total_duration=d.get("total_duration", 0.0),
         clips=clips,
     )
+
+
+def _load_captures(path: Path) -> dict:
+    """Map scene_id -> captured mp4 path from capture.json (if it exists)."""
+    if not path.exists():
+        return {}
+    d = json.loads(path.read_text(encoding="utf-8"))
+    out: dict = {}
+    for a in d.get("assets", []):
+        if a.get("video_path") and a.get("scene_id"):
+            out[a["scene_id"]] = a["video_path"]
+    return out
 
 
 def _load_research(path: Path) -> ResearchReport:

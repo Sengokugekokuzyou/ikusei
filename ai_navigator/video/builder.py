@@ -52,7 +52,8 @@ class VideoBuilder:
         self._ffmpeg_override = (cfg.get("video.ffmpeg_path", "") if cfg else "")
         self._chrome_path = (cfg.get("thumbnail.chrome_path", "") if cfg else "")
 
-    def run(self, storyboard: Storyboard, voice: VoiceManifest, report_dir: Path) -> VideoResult:
+    def run(self, storyboard: Storyboard, voice: VoiceManifest, report_dir: Path,
+            captures: dict | None = None) -> VideoResult:
         result = VideoResult(
             topic=storyboard.topic, produced_at=storyboard.produced_at,
             width=W, height=H, fps=self._fps, scenes=len(storyboard.scenes),
@@ -77,9 +78,25 @@ class VideoBuilder:
         # 2) Per-scene Ken Burns segments.
         seg_dir = report_dir / "frames"
         seg_list = seg_dir / "segments.txt"
+        captures = captures or {}
         lines = []
         for i, (rel, dur) in enumerate(frames):
             seg_rel = f"frames/seg_{i:03d}.mp4"
+            scene_id = storyboard.scenes[i].scene_id if i < len(storyboard.scenes) else -1
+            clip_rel = captures.get(scene_id)
+            if clip_rel and (report_dir / clip_rel).exists():
+                # Real captured footage: loop/trim to the scene's narration length.
+                cmd = [
+                    ffmpeg, "-y", "-stream_loop", "-1", "-t", f"{dur:.3f}", "-i", clip_rel,
+                    "-vf", f"scale={W}:{H},setsar=1,format=yuv420p", "-c:v", "libx264",
+                    "-preset", "veryfast", "-pix_fmt", "yuv420p", "-r", str(self._fps), seg_rel,
+                ]
+                proc = subprocess.run(cmd, cwd=report_dir, capture_output=True, text=True)
+                if proc.returncode != 0 or not (report_dir / seg_rel).exists():
+                    result.warnings.append(f"収録シーン{i}の合成失敗: {proc.stderr[-200:]}")
+                    return result
+                lines.append(f"file '{Path(seg_rel).name}'")
+                continue
             if self._motion:
                 # Single image input (NO -loop): zoompan d=frames emits exactly
                 # the frames we want. -loop would feed zoompan a stream and
