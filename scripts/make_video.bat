@@ -9,8 +9,8 @@ setlocal EnableDelayedExpansion
 cd /d "%~dp0.."
 
 rem ==== VOICE ====  Change this number to pick the VOICEVOX voice.
-rem   13 = 青山龍星 (ノーマル)   3 = ずんだもん (ノーマル)
-rem   To see all ids: py -m ai_navigator speakers  (with VOICEVOX running)
+rem   13 = Aoyama Ryusei (normal)   3 = Zundamon (normal)
+rem   See all ids: py -m ai_navigator speakers   (with VOICEVOX running)
 set "SPEAKER=13"
 
 echo ============================================
