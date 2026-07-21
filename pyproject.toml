@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ai-navigator"
+version = "0.1.0"
+description = "AI Navigator — automated research/planning pipeline for beginner-friendly AI explainer videos"
+requires-python = ">=3.11"
+readme = "README.md"
+dependencies = []
+
+[project.optional-dependencies]
+anthropic = ["anthropic>=0.40"]
+openai = ["openai>=1.40"]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+ai-navigator = "ai_navigator.cli:main"
+
+[tool.setuptools]
+packages = [
+    "ai_navigator",
+    "ai_navigator.schemas",
+    "ai_navigator.llm",
+    "ai_navigator.research",
+    "ai_navigator.planner",
+    "ai_navigator.database",
+]

@@ -1,0 +1,9 @@
+# Phase 1 runs on the Python 3.11 standard library alone — no install required
+# to use the MockProvider and the full plan pipeline.
+#
+# Install these only when you switch providers.text away from "mock":
+#   anthropic>=0.40      # AnthropicProvider (text/reasoning)
+#   openai>=1.40         # OpenAIProvider (text + later image generation)
+#
+# Dev / test (optional):
+#   pytest>=8.0

@@ -1,0 +1,29 @@
+{
+  "tool": "Codex",
+  "category": "coding_agent",
+  "updated_at": "2026-07-21",
+  "pricing": {
+    "free_tier": null,
+    "paid_plans": ["ChatGPT subscription tiers"],
+    "notes": "Seed placeholder — re-verify against official pricing before publishing."
+  },
+  "strengths": [
+    "ChatGPTの延長で使い始めやすい",
+    "指示から一気にコードを書き上げるのが得意",
+    "クラウド上でタスクを並行実行できる"
+  ],
+  "weaknesses": [
+    "既存の大規模プロジェクト文脈の扱いは相手を選ぶ",
+    "細かい制御はやや効きにくい場面がある"
+  ],
+  "best_for": [
+    "ChatGPTからそのまま開発支援に踏み込みたい人",
+    "ゼロから素早く作りたい人"
+  ],
+  "not_for": [
+    "ターミナル常駐で細かく制御したい人"
+  ],
+  "official_sources": [
+    "https://openai.com/index/introducing-codex/"
+  ]
+}

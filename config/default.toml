@@ -1,0 +1,49 @@
+# AI Navigator — default configuration (Phase 1)
+# TOML is read by the stdlib `tomllib` (Python 3.11+). No dependency needed.
+
+[project]
+channel_name = "AI Navigator"
+language = "ja"
+
+[providers]
+# Which LLM backend each family of tasks uses.
+# One of: "mock" | "anthropic" | "openai".
+# "mock" is deterministic and needs no API key — use it to verify structure.
+text = "mock"
+# `image` is declared for later phases; Phase 1 never calls it.
+image = "openai"
+
+[providers.models]
+anthropic = "claude-opus-4-8"
+openai = "gpt-4o"
+
+[planner]
+# Spec §9: at least 10 ideas per topic.
+ideas_per_topic = 10
+# Spec §10: at least 5 weaknesses per idea from the Critic.
+min_weaknesses_per_idea = 5
+
+# Spec §11: 100-point scoring weights. Must sum to 100.
+[planner.score_weights]
+beginner_value = 25   # 初心者価値
+practicality = 20     # 実用性
+search_demand = 15    # 検索需要
+topicality = 10       # 話題性
+comparison_need = 10  # 比較需要
+video_appeal = 10     # 動画映え
+differentiation = 5   # 差別化
+info_reliability = 5  # 情報信頼性
+
+# Spec §11: Judge thresholds.
+[planner.judge]
+video_min = 80    # >= 80  -> full video candidate
+shorts_min = 65   # 65..79 -> Shorts candidate
+# <= 64 -> discard
+
+[fact_check]
+# Spec §13: fail the plan if fact confidence is below this.
+min_fact_score = 95
+
+[paths]
+reports_dir = "reports"
+tools_db_dir = "data/tools"
