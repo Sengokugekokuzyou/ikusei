@@ -69,6 +69,7 @@ from .capture import (  # noqa: E402
     CaptureAsset,
     CaptureManifest,
 )
+from .image import ImageAsset, ImageManifest  # noqa: E402
 
 __all__ = [
     "to_dict",
@@ -114,4 +115,6 @@ __all__ = [
     "CaptureRecipe",
     "CaptureAsset",
     "CaptureManifest",
+    "ImageAsset",
+    "ImageManifest",
 ]

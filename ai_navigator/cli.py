@@ -165,6 +165,33 @@ def _cmd_voice(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_images(args: argparse.Namespace) -> int:
+    cfg = load_config()
+    report_dir = Path(args.plan)
+    if not (report_dir / "storyboard.json").exists():
+        print(f"error: {report_dir}/storyboard.json not found. Run `script` first.", file=sys.stderr)
+        return 2
+    if args.provider:
+        cfg.set("image.provider", args.provider)
+    pipeline = PlanPipeline(cfg)
+    manifest = pipeline.build_images_from_dir(report_dir)
+    print(f"Report dir : {report_dir}")
+    print("-" * 48)
+    if manifest.assets:
+        for a in manifest.assets:
+            tag = "公式引用" if a.is_official else a.source
+            print(f"🖼️  scene#{a.scene_id}: {a.file_path}  [{tag}]"
+                  + (f"  出典:{a.caption}" if a.caption else ""))
+        print(f"クレジット → {report_dir}/credits.txt")
+    else:
+        print(f"🖼️  画像なし（provider={manifest.provider}）。"
+              " assets/scene_<番号>.jpg を置くか、image.provider を openverse/pixabay に。")
+    for w in manifest.warnings:
+        print(f"   ⚠️  {w}")
+    print("   → `video --plan` で該当シーンの背景に合成されます。")
+    return 0
+
+
 def _cmd_capture(args: argparse.Namespace) -> int:
     from datetime import datetime
     cfg = load_config()
@@ -245,6 +272,12 @@ def _cmd_run(args: argparse.Namespace) -> int:
     _print_script_result(bqa, fqa, storyboard, out_dir)
     _print_thumbnail_result(thumbs)
     if getattr(args, "video", False):
+        # Images: local assets/ overrides + configured provider (none = instant).
+        imgs = pipeline.build_images_from_dir(out_dir)
+        placed = [a for a in imgs.assets if a.file_path]
+        if placed:
+            print(f"🖼️  画像 {len(placed)}枚をシーン背景に反映"
+                  + ("（credits.txt生成）" if any(a.attribution_required or a.is_official for a in placed) else ""))
         video = pipeline.build_video_from_dir(out_dir)
         _print_video_result(video, out_dir)
         if getattr(args, "open", False) and video.ok:
@@ -306,6 +339,12 @@ def build_parser() -> argparse.ArgumentParser:
     speakers = sub.add_parser("speakers", help="List VOICEVOX speakers/styles from a running engine")
     speakers.add_argument("--endpoint", default=None, help="VOICEVOX endpoint URL (default from config)")
     speakers.set_defaults(func=_cmd_speakers)
+
+    images = sub.add_parser("images", help="Fetch/assign B-roll photos for a dir (§48)")
+    images.add_argument("--plan", required=True, help="reports/YYYY-MM-DD_<slug>/ directory")
+    images.add_argument("--provider", default=None, choices=["none", "openverse", "pixabay"],
+                        help="Override image.provider")
+    images.set_defaults(func=_cmd_images)
 
     capture = sub.add_parser("capture", help="Record demo operation footage (Playwright) for a dir")
     capture.add_argument("--plan", required=True, help="reports/YYYY-MM-DD_<slug>/ directory")

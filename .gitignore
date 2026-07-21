@@ -16,6 +16,10 @@ venv/
 /reports/*
 !/reports/.gitkeep
 
+# User-curated image assets: keep the folder + README, ignore the images
+/assets/*
+!/assets/README.md
+
 # OS / editor
 .DS_Store
 *.swp

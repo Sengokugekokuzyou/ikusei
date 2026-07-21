@@ -31,5 +31,6 @@ packages = [
     "ai_navigator.thumbnail",
     "ai_navigator.video",
     "ai_navigator.capture",
+    "ai_navigator.image",
     "ai_navigator.database",
 ]

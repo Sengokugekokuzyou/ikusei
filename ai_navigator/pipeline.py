@@ -31,6 +31,8 @@ from .voice import VoiceSynthesizer, build_adapter
 from .thumbnail import ChromiumThumbnailRenderer, ThumbnailDirector, ThumbnailJudge
 from .video import VideoBuilder
 from .capture import CaptureRecorder, placeholder_recipe
+from .image import ImageManager, build_image_provider
+from .image.manager import build_credits
 from .schemas import (
     BeginnerQAReport,
     FactQAReport,
@@ -51,6 +53,8 @@ from .schemas import (
     VoiceClip,
     VoiceManifest,
     CaptureManifest,
+    ImageAsset,
+    ImageManifest,
     to_json,
 )
 
@@ -243,12 +247,28 @@ class PlanPipeline:
         self._write(report_dir / "capture.json", manifest)
         return manifest
 
+    # --- Images (§48/§49/§70) — free stock/CC/local B-roll ----------------
+    def build_images_from_dir(self, report_dir: Path) -> ImageManifest:
+        from .config import REPO_ROOT
+        storyboard = _load_storyboard(report_dir / "storyboard.json")
+        provider = build_image_provider(
+            self._cfg.get("image.provider", "none"),
+            api_key=os.environ.get("PIXABAY_API_KEY", ""),
+        )
+        assets_dir = REPO_ROOT / self._cfg.get("image.assets_dir", "assets")
+        manifest = ImageManager(provider, assets_dir).run(storyboard, report_dir)
+        self._write(report_dir / "images.json", manifest)
+        (report_dir / "credits.txt").write_text(build_credits(manifest), encoding="utf-8")
+        return manifest
+
     # --- Phase 4: Video (§4-5) — free FFmpeg render -----------------------
     def build_video_from_dir(self, report_dir: Path) -> VideoResult:
         storyboard = _load_storyboard(report_dir / "storyboard.json")
         voice = _load_voice(report_dir / "voice.json")
         captures = _load_captures(report_dir / "capture.json")
-        result = VideoBuilder(self._cfg).run(storyboard, voice, report_dir, captures=captures)
+        images = _load_images(report_dir / "images.json")
+        result = VideoBuilder(self._cfg).run(
+            storyboard, voice, report_dir, captures=captures, images=images)
         self._write(report_dir / "video.json", result)
         return result
 
@@ -340,6 +360,25 @@ def _load_voice(path: Path) -> VoiceManifest:
         adapter=d.get("adapter", "mock"), total_duration=d.get("total_duration", 0.0),
         clips=clips,
     )
+
+
+def _load_images(path: Path) -> dict:
+    """Map scene_id -> ImageAsset from images.json (if it exists)."""
+    if not path.exists():
+        return {}
+    d = json.loads(path.read_text(encoding="utf-8"))
+    out: dict = {}
+    for a in d.get("assets", []):
+        if a.get("file_path") and a.get("scene_id"):
+            out[a["scene_id"]] = ImageAsset(
+                scene_id=a["scene_id"], role=a.get("role", "broll"),
+                source=a.get("source", "local"), query=a.get("query", ""),
+                file_path=a.get("file_path", ""), page_url=a.get("page_url", ""),
+                author=a.get("author", ""), license=a.get("license", ""),
+                attribution_required=bool(a.get("attribution_required")),
+                caption=a.get("caption", ""), is_official=bool(a.get("is_official")),
+            )
+    return out
 
 
 def _load_captures(path: Path) -> dict:

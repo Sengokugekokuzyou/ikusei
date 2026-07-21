@@ -8,6 +8,8 @@ clean static composition — the words are spoken and shown as burned subtitles.
 
 from __future__ import annotations
 
+import base64
+import mimetypes
 from pathlib import Path
 
 from ..htmlrender import render_html_to_png
@@ -40,7 +42,14 @@ def _short(t: str, n: int = 26) -> str:
     return t if len(t) <= n else t[: n - 1] + "…"
 
 
-def build_scene_html(scene: Scene, working_title: str) -> str:
+def _data_uri(path: Path) -> str:
+    """Embed an image file as a data: URI (works offline + cross-platform in headless)."""
+    mime = mimetypes.guess_type(str(path))[0] or "image/jpeg"
+    b64 = base64.b64encode(path.read_bytes()).decode("ascii")
+    return f"data:{mime};base64,{b64}"
+
+
+def build_scene_html(scene: Scene, working_title: str, bg_uri: str = "", caption: str = "") -> str:
     label = _SECTION_LABEL.get(scene.section, "")
     p = scene.params or {}
     body = ""
@@ -72,11 +81,20 @@ def build_scene_html(scene: Scene, working_title: str) -> str:
         body = f'<div class="tip">{_esc(_short(scene.voice, 34))}</div>'
 
     chip = f'<div class="chip">{_esc(label)}</div>' if label else ""
+    cap_html = f'<div class="src">{_esc(caption)}</div>' if caption else ""
+    # A real photo becomes the background under a dark overlay so text stays legible.
+    if bg_uri:
+        canvas_bg = (f"linear-gradient(rgba(9,14,28,.58),rgba(9,14,28,.72)),"
+                     f"url('{bg_uri}') center/cover no-repeat")
+    else:
+        canvas_bg = _BG
     return f"""<!doctype html><html><head><meta charset="utf-8"><style>
     html,body{{margin:0;padding:0;background:{_BG};overflow:hidden}}
-    .canvas{{position:absolute;top:0;left:0;width:{W}px;height:{H}px;background:{_BG};
+    .canvas{{position:absolute;top:0;left:0;width:{W}px;height:{H}px;background:{canvas_bg};
       font-family:{_FONT};color:#fff;box-sizing:border-box;padding:72px;
       display:flex;flex-direction:column;align-items:center;justify-content:center;gap:44px;text-align:center}}
+    .src{{position:absolute;right:28px;bottom:22px;font-size:22px;color:rgba(255,255,255,.82);
+      background:rgba(0,0,0,.45);padding:6px 16px;border-radius:8px}}
     .chip{{position:absolute;top:48px;left:64px;background:{_ACCENT};color:#111;
       font-size:34px;font-weight:800;border-radius:999px;padding:10px 34px}}
     .title{{font-size:88px;font-weight:900;line-height:1.1;text-shadow:{_SHADOW};max-width:1050px}}
@@ -101,20 +119,28 @@ def build_scene_html(scene: Scene, working_title: str) -> str:
     .bar{{background:#1f2937;padding:18px 24px;display:flex;gap:16px}}
     .bar i{{width:22px;height:22px;border-radius:50%;background:#4b5563;display:block}}
     .screen{{padding:120px 24px;font-size:54px;color:#93c5fd;font-weight:700}}
-    </style></head><body><div class="canvas">{chip}{body}</div></body></html>"""
+    </style></head><body><div class="canvas">{chip}{body}{cap_html}</div></body></html>"""
 
 
 class SceneFrameRenderer:
     def __init__(self, chrome_path: str = "") -> None:
         self._chrome_path = chrome_path
 
-    def render_all(self, storyboard: Storyboard, out_dir: Path) -> list[tuple[str, float]]:
+    def render_all(self, storyboard: Storyboard, out_dir: Path, images: dict | None = None
+                   ) -> list[tuple[str, float]]:
+        """images: {scene_id: ImageAsset} — scenes with one get a photo background."""
+        images = images or {}
         frames: list[tuple[str, float]] = []
         for sc in storyboard.scenes:
             rel = f"frames/scene_{sc.scene_id:03d}.png"
+            bg_uri, caption = "", ""
+            asset = images.get(sc.scene_id)
+            if asset and asset.file_path and (out_dir / asset.file_path).exists():
+                bg_uri = _data_uri(out_dir / asset.file_path)
+                caption = asset.caption
             # Render uncropped (fast); ffmpeg crops the top W×H per segment.
             render_html_to_png(
-                build_scene_html(sc, storyboard.working_title),
+                build_scene_html(sc, storyboard.working_title, bg_uri=bg_uri, caption=caption),
                 out_dir / rel, width=W, height=H, chrome_path=self._chrome_path, crop=False,
             )
             frames.append((rel, sc.duration))

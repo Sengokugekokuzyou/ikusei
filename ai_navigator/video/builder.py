@@ -57,7 +57,7 @@ class VideoBuilder:
         self._chrome_path = (cfg.get("thumbnail.chrome_path", "") if cfg else "")
 
     def run(self, storyboard: Storyboard, voice: VoiceManifest, report_dir: Path,
-            captures: dict | None = None) -> VideoResult:
+            captures: dict | None = None, images: dict | None = None) -> VideoResult:
         result = VideoResult(
             topic=storyboard.topic, produced_at=storyboard.produced_at,
             width=W, height=H, fps=self._fps, scenes=len(storyboard.scenes),
@@ -74,7 +74,7 @@ class VideoBuilder:
             return result
 
         # 1) Scene frames + narration track.
-        frames = SceneFrameRenderer(self._chrome_path).render_all(storyboard, report_dir)
+        frames = SceneFrameRenderer(self._chrome_path).render_all(storyboard, report_dir, images=images)
         narration = report_dir / "narration.wav"
         audio_dur = build_narration_wav(voice, report_dir, narration)
         has_audio = audio_dur > 0

@@ -112,6 +112,7 @@ ai_navigator/
 ├── thumbnail/               # ThumbnailDirector(§62) / ChromiumRenderer(§54,61) / Judge(§64)
 ├── video/                   # SceneFrames(§25) / Ken Burns + narration + 字幕焼込み(§4-5)
 ├── capture/                 # Playwright録画 + カーソル合成(§5-6) / §49準拠デモ
+├── image/                   # ImageDirector(§50) / providers(pixabay/openverse) / 引用対応(§48/§49)
 ├── htmlrender.py            # 共通 HTML→PNG（Chromium、サムネ/動画フレーム共用）
 └── database/                # AI Tool Database(§14)
 config/default.toml          # 配点・閾値・プロバイダ設定
@@ -212,9 +213,27 @@ VOICEVOXに繋がらない場合は自動で無音(mock)にフォールバック
 有料のOpenAI画像生成（§46-73）は使わず、**¥0・APIキー不要**で回します。仕様 §70 では生成画像は優先度4番目で、上位（実収録＋Remotionモーション）で代替できるためです。
 
 - **サムネイル（§61-64）**: HTML/CSSで組み、**同梱のChromiumで1280×720 PNGに書き出し**。§54「文字は焼き込まず後載せ」に一致し、日本語（IPAGothic）も正確。ディレクター（§62）が最低3案を生成、ルールベースのJudge（§64）が選定。
-- **B-roll / コンセプト図（§48）**: 既定は **Remotionモーション**で表現（`image.provider = "none"`）。任意で無料ストックAPI（stock）やローカルStable Diffusion（local_sd）を後付け可能。`openai`は有料オプションとして残置。
+- **B-roll / 背景（§48）**: シーン背景に**実写や公式スクショ**を合成できます（下記）。
 
 `config` は `[image] provider = "none"` / `[thumbnail] renderer = "chromium"`。Chromiumは自動検出（`thumbnail.chrome_path`で明示も可）。
+
+### 実写B-roll & 公式画像の引用（§48/§49/§70）
+
+「手作りカードだけ」を脱するため、人物/背景の**実写B-roll**や、**公式スクショ・公式Xの引用**をシーン背景に合成します（暗いオーバーレイで文字は読みやすいまま、出典キャプション付き）。
+
+```bash
+# 無料ストック/CCから自動取得（openverse=キー不要, pixabay=要無料キー）
+python -m ai_navigator images --plan reports/2026-07-21_.../ --provider openverse
+python -m ai_navigator video  --plan reports/2026-07-21_.../
+```
+
+| provider | 中身 | ライセンス | キー |
+|---|---|---|---|
+| `none`(既定) | 取得しない（`assets/`のローカル画像だけ使用） | — | 不要 |
+| `openverse` | CC画像 | 帰属必要（`credits.txt`に自動収集） | 不要 |
+| `pixabay` | 商用安全な写真 | 帰属不要 | `PIXABAY_API_KEY`（無料） |
+
+**公式スクショ・公式Xの引用**（Kimi等、手元に無いツールも）: `assets/scene_<番号>.jpg` を置き、`assets/scene_<番号>.txt` に出典（例:`出典: OpenAI 公式発表 https://...`）を書くと、そのシーン背景に使われ、**画面右下に出典を表示**（著作権法§32「引用」の出典明示）。`ImageDirector` は人物/概念シーンだけに画像を割当て、比較カードや実演（実収録）は据え置き。**架空UIの偽装はしません（§49）**。クレジットは概要欄用に `credits.txt` を自動出力。
 
 ## Phase 4: 動画生成（§4-5、FFmpegベース・無料）
 

@@ -57,10 +57,14 @@ endpoint = "http://127.0.0.1:50021"
 speaker = 13
 
 [image]
-# Free-first strategy: rely on Remotion motion graphics (§70 priority 3) and
-# real captures (Phase 5). Generated images are OFF by default.
-# "none" | "stock" | "local_sd" | "openai" (last two/paid are optional add-ons).
+# Real photos for B-roll/background scenes (§48). Providers:
+#   "none"      : no fetching (local assets/ overrides still work)
+#   "openverse" : keyless CC images (attribution auto-collected into credits.txt)
+#   "pixabay"   : free, commercial-safe, no attribution (needs PIXABAY_API_KEY)
+# NEVER used to fake a real product UI (§49). Official screens: drop real files
+# into assets/scene_<id>.jpg (+ scene_<id>.txt for the 出典 caption).
 provider = "none"
+assets_dir = "assets"
 
 [thumbnail]
 # Thumbnails are composed in HTML and rendered to PNG by headless Chromium —
