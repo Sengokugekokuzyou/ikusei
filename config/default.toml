@@ -63,7 +63,9 @@ speaker = 13
 #   "pixabay"   : free, commercial-safe, no attribution (needs PIXABAY_API_KEY)
 # NEVER used to fake a real product UI (§49). Official screens: drop real files
 # into assets/scene_<id>.jpg (+ scene_<id>.txt for the 出典 caption).
-provider = "none"
+# Default "openverse": keyless, so the double-click flow gets real B-roll with no
+# setup. For faster/higher-quality photos, set "pixabay" + PIXABAY_API_KEY.
+provider = "openverse"
 assets_dir = "assets"
 
 [thumbnail]

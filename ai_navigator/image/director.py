@@ -21,14 +21,21 @@ _SECTION_IMAGE = {
 
 class ImageDirector:
     def plan(self, storyboard: Storyboard) -> list[tuple[int, str, str]]:
-        """Return (scene_id, role, query) for scenes that should get a photo."""
+        """Return (scene_id, role, query) — one photo per mapped section.
+
+        Only the first scene of each concept section gets a photo, so a section
+        reads as [photo intro] then clean info cards, instead of a repetitive
+        photo on every line (also fewer network fetches).
+        """
         out: list[tuple[int, str, str]] = []
+        seen: set[str] = set()
         for sc in storyboard.scenes:
             # real_demo is reserved for real capture; never a stock/fake screen.
-            if sc.section == "real_demo":
+            if sc.section == "real_demo" or sc.section in seen:
                 continue
             mapping = _SECTION_IMAGE.get(sc.section)
             if mapping:
+                seen.add(sc.section)
                 role, query = mapping
                 out.append((sc.scene_id, role, query))
         return out

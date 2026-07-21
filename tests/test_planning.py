@@ -104,13 +104,14 @@ def test_generator_min_ideas():
     assert len(ideas.ideas) >= 10
 
 
-def test_windows_batch_is_pure_ascii():
+def test_windows_batches_are_pure_ascii():
     # A .bat with non-ASCII bytes breaks cmd parsing on Japanese Windows (CP932)
-    # and the window closes instantly. Keep make_video.bat ASCII-only.
-    bat = Path(__file__).resolve().parent.parent / "scripts" / "make_video.bat"
-    data = bat.read_bytes()
-    bad = [(i, b) for i, b in enumerate(data) if b > 127]
-    assert not bad, f"non-ASCII bytes in make_video.bat at offsets {[i for i, _ in bad[:5]]}"
+    # and the window closes instantly. Keep every .bat ASCII-only.
+    scripts = Path(__file__).resolve().parent.parent / "scripts"
+    for bat in sorted(scripts.glob("*.bat")):
+        data = bat.read_bytes()
+        bad = [i for i, b in enumerate(data) if b > 127]
+        assert not bad, f"non-ASCII bytes in {bat.name} at offsets {bad[:5]}"
 
 
 def test_slugify():
