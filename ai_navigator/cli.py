@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import sys
 from datetime import date
+from pathlib import Path
 
 from .config import load_config
 from .pipeline import PlanPipeline
@@ -44,6 +45,63 @@ def _cmd_plan(args: argparse.Namespace) -> int:
     return 0
 
 
+def _print_script_result(bqa, fqa, out_dir: Path) -> None:
+    print("-" * 48)
+    b = "✅" if bqa.passed else "🛑"
+    f = "✅" if fqa.passed else "🛑"
+    print(f"{b} Beginner QA : {bqa.score}/100 (pass>=80, attempts={bqa.attempts})")
+    print(f"{f} Fact QA     : {fqa.score}/100 ({fqa.supported_claims}/{fqa.total_claims} claims, pass>=95)")
+    if bqa.issues or fqa.issues:
+        print("Issues:")
+        for iss in (bqa.issues + fqa.issues):
+            print(f"  [{iss.severity}] {iss.check}: {iss.detail}")
+    print(f"Script      : {out_dir}/script.json (+ script_tts.json)")
+
+
+def _cmd_script(args: argparse.Namespace) -> int:
+    cfg = load_config()
+    report_dir = Path(args.plan)
+    if not (report_dir / "selected_plan.json").exists():
+        print(f"error: {report_dir}/selected_plan.json not found. Run `plan` first.", file=sys.stderr)
+        return 2
+    pipeline = PlanPipeline(cfg)
+    _script, bqa, fqa = pipeline.run_script_from_dir(report_dir)
+    print(f"Report dir : {report_dir}")
+    _print_script_result(bqa, fqa, report_dir)
+    return 0
+
+
+def _cmd_run(args: argparse.Namespace) -> int:
+    """plan -> (if produce) script, end to end."""
+    cfg = load_config()
+    on_date = date.fromisoformat(args.date) if args.date else None
+    pipeline = PlanPipeline(cfg)
+    plan, out_dir = pipeline.run(args.topic, on_date=on_date)
+    _cmd_plan_print(plan, out_dir, cfg)
+    if not plan.produce:
+        return 0
+    _script, bqa, fqa = pipeline.run_script_from_dir(out_dir)
+    _print_script_result(bqa, fqa, out_dir)
+    return 0
+
+
+def _cmd_plan_print(plan, out_dir, cfg) -> None:
+    provider = cfg.get("providers.text", "mock")
+    print(f"Topic     : {plan.topic}")
+    print(f"Provider  : {provider}")
+    print(f"Output    : {out_dir}")
+    print("-" * 48)
+    if plan.produce:
+        print(f"✅ PRODUCE  ({plan.verdict.value})")
+        print(f"Title     : {plan.working_title}")
+        print(f"Score     : {plan.score_total}/100   Fact: {plan.fact_score}/100")
+        if plan.comparison_targets:
+            print(f"Compare   : {' vs '.join(plan.comparison_targets)}")
+    else:
+        print("🛑 DECLINE — 今日は投稿しない")
+        print(f"Reason    : {plan.decline_reason}")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="ai_navigator",
@@ -55,6 +113,15 @@ def build_parser() -> argparse.ArgumentParser:
     plan.add_argument("--topic", required=True, help='e.g. "Claude Code vs Codex"')
     plan.add_argument("--date", default=None, help="Override production date (YYYY-MM-DD)")
     plan.set_defaults(func=_cmd_plan)
+
+    script = sub.add_parser("script", help="Write + QA a script from an existing plan dir")
+    script.add_argument("--plan", required=True, help="reports/YYYY-MM-DD_<slug>/ directory")
+    script.set_defaults(func=_cmd_script)
+
+    run = sub.add_parser("run", help="plan -> script, end to end")
+    run.add_argument("--topic", required=True, help='e.g. "Claude Code vs Codex"')
+    run.add_argument("--date", default=None, help="Override production date (YYYY-MM-DD)")
+    run.set_defaults(func=_cmd_run)
 
     return parser
 

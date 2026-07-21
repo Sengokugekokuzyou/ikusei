@@ -13,6 +13,7 @@ and writes the six report artifacts a human reviews before Phase 2:
 
 from __future__ import annotations
 
+import json
 import re
 import unicodedata
 from datetime import date
@@ -22,8 +23,18 @@ from .config import Config
 from .database import ToolDatabase
 from .llm import build_provider
 from .planner import Critic, IdeaGenerator, Judge, Scorer
-from .research import FactChecker, Researcher, extract_tools
-from .schemas import SelectedPlan, to_json
+from .research import BeginnerTranslator, FactChecker, Researcher, extract_tools
+from .script import BeginnerQA, FactQA, ScriptWriter, TTSFormatter
+from .schemas import (
+    BeginnerQAReport,
+    FactQAReport,
+    Finding,
+    ResearchReport,
+    Script,
+    SelectedPlan,
+    Verdict,
+    to_json,
+)
 
 
 def slugify(text: str) -> str:
@@ -86,6 +97,71 @@ class PlanPipeline:
         )
         return plan, out_dir
 
+    # --- Phase 2: Script system (§17/§8/§20/§13) ---------------------------
+    def build_script(
+        self, plan: SelectedPlan, research: ResearchReport
+    ) -> tuple[Script, BeginnerQAReport, FactQAReport, "TTSScriptType"]:
+        translator = BeginnerTranslator()
+        tool_db = self._tool_db.all()
+        writer = ScriptWriter(self._llm, tool_db, translator)
+        beginner_qa = BeginnerQA(threshold=80, translator=translator)
+        fact_qa = FactQA(tool_db, threshold=self._cfg.get("fact_check.min_fact_score", 95))
+        formatter = TTSFormatter()
+
+        # Regeneration loop (§20/§30): rewrite until beginner QA clears the bar.
+        max_attempts = 3
+        script = writer.run(plan, research)
+        bqa = beginner_qa.run(script, attempts=1)
+        attempt = 1
+        while not bqa.passed and attempt < max_attempts:
+            attempt += 1
+            script = writer.run(plan, research)
+            bqa = beginner_qa.run(script, attempts=attempt)
+
+        fqa = fact_qa.run(script, research)
+        tts = formatter.run(script)
+        return script, bqa, fqa, tts
+
+    def run_script_from_dir(self, report_dir: Path) -> tuple[Script, BeginnerQAReport, FactQAReport]:
+        plan = _load_plan(report_dir / "selected_plan.json")
+        research = _load_research(report_dir / "research.json")
+        script, bqa, fqa, tts = self.build_script(plan, research)
+        self._write(report_dir / "script.json", script)
+        self._write(report_dir / "script_tts.json", tts)
+        self._write(report_dir / "beginner_qa.json", bqa)
+        self._write(report_dir / "fact_qa.json", fqa)
+        return script, bqa, fqa
+
     @staticmethod
     def _write(path: Path, obj) -> None:
         path.write_text(to_json(obj) + "\n", encoding="utf-8")
+
+
+# Type alias used only for the return annotation above.
+from .schemas import TTSScript as TTSScriptType  # noqa: E402
+
+
+def _load_plan(path: Path) -> SelectedPlan:
+    d = json.loads(path.read_text(encoding="utf-8"))
+    d["verdict"] = Verdict(d.get("verdict", "discard"))
+    return SelectedPlan(**d)
+
+
+def _load_research(path: Path) -> ResearchReport:
+    d = json.loads(path.read_text(encoding="utf-8"))
+    findings = [
+        Finding(
+            claim=f.get("claim", ""),
+            detail=f.get("detail", ""),
+            source_urls=list(f.get("source_urls", [])),
+            kind=f.get("kind", "fact"),
+        )
+        for f in d.get("findings", [])
+    ]
+    # FactQA only needs topic + findings; keep the loader minimal.
+    return ResearchReport(
+        topic=d.get("topic", ""),
+        produced_at=d.get("produced_at", ""),
+        tools_covered=list(d.get("tools_covered", [])),
+        findings=findings,
+    )

@@ -43,6 +43,16 @@ from .idea import Idea, IdeaSet  # noqa: E402
 from .critique import Critique, CritiqueSet  # noqa: E402
 from .score import ScoreBreakdown, ScoredIdea, ScoreSet, Verdict  # noqa: E402
 from .plan import SelectedPlan  # noqa: E402
+from .script import (  # noqa: E402
+    AudioUnit,
+    Script,
+    ScriptLine,
+    ScriptSection,
+    TTSScript,
+    SECTION_ORDER,
+    SECTION_LABELS,
+)
+from .qa import BeginnerQAReport, FactQAReport, QAIssue  # noqa: E402
 
 __all__ = [
     "to_dict",
@@ -64,4 +74,14 @@ __all__ = [
     "ScoreSet",
     "Verdict",
     "SelectedPlan",
+    "Script",
+    "ScriptLine",
+    "ScriptSection",
+    "AudioUnit",
+    "TTSScript",
+    "SECTION_ORDER",
+    "SECTION_LABELS",
+    "BeginnerQAReport",
+    "FactQAReport",
+    "QAIssue",
 ]

@@ -25,5 +25,6 @@ packages = [
     "ai_navigator.llm",
     "ai_navigator.research",
     "ai_navigator.planner",
+    "ai_navigator.script",
     "ai_navigator.database",
 ]

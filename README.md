@@ -2,7 +2,7 @@
 
 AIに詳しくない人向けに「増えすぎたAIを、調べて・試して・比較して "あなたはこれを使えばいい" と答える」YouTube動画を、可能な限り自動で制作・改善するためのシステムです。
 
-このリポジトリは **Phase 1（Research + Planner）** の実装です。1つのトピックを入力すると、調査 → ファクトチェック → 企画10案 → ダメ出し → 採点 → 判定 までを自動で行い、人間がレビューできる形でレポートを出力します。
+このリポジトリは **Phase 1（Research + Planner）＋ Phase 2（Script System）** の実装です。1つのトピックを入力すると、調査 → ファクトチェック → 企画10案 → ダメ出し → 採点 → 判定 → 台本 → TTS整形 → 初心者QA → ファクトQA までを自動で行い、人間がレビューできる形でレポートを出力します。
 
 > 設計思想（仕様書 §43/§45）: 目的は動画の量産ではなく、初心者に本当に役立つ解説を高品質で作ること。**基準未満なら投稿しない。**
 
@@ -13,7 +13,14 @@ AIに詳しくない人向けに「増えすぎたAIを、調べて・試して�
 依存パッケージのインストールは不要です（Phase 1 は Python 3.11 標準ライブラリのみで動きます）。
 
 ```bash
+# 企画のみ（Phase 1）
 python -m ai_navigator plan --topic "Claude Code vs Codex"
+
+# 企画→台本まで一気に（Phase 1 + 2）
+python -m ai_navigator run --topic "Claude Code vs Codex"
+
+# 既存の企画ディレクトリから台本だけ（Phase 2）
+python -m ai_navigator script --plan reports/2026-07-21_claude-code-vs-codex/
 ```
 
 出力例:
@@ -22,20 +29,26 @@ python -m ai_navigator plan --topic "Claude Code vs Codex"
 ✅ PRODUCE  (video)
 Title     : Claude Code と Codex、あなたはこっち
 Score     : 83/100   Fact: 100/100
-Target    : ChatGPTは知っているが選べないAI初心者
 Compare   : Claude Code vs Codex
+------------------------------------------------
+✅ Beginner QA : 100/100 (pass>=80, attempts=1)
+✅ Fact QA     : 100/100 (7/7 claims, pass>=95)
 ```
 
-レポートは `reports/YYYY-MM-DD_<slug>/` に6ファイル書き出されます（仕様 §44）:
+レポートは `reports/YYYY-MM-DD_<slug>/` に書き出されます:
 
-| ファイル | 内容 |
-|---|---|
-| `research.json` | 調査結果（Tier1〜4のソース・findings・初心者の疑問） |
-| `ideas.json` | 企画10案（§9） |
-| `critique.json` | 各案の欠点 最低5個（§10） |
-| `scores.json` | 100点満点の採点＋判定（§11） |
-| `selected_plan.json` | 採用案・理由・タイトル候補・ターゲット・比較対象（§44） |
-| `sources.json` | 使用ソース一覧 |
+| ファイル | 内容 | フェーズ |
+|---|---|---|
+| `research.json` | 調査結果（Tier1〜4のソース・findings・初心者の疑問） | 1 |
+| `ideas.json` | 企画10案（§9） | 1 |
+| `critique.json` | 各案の欠点 最低5個（§10） | 1 |
+| `scores.json` | 100点満点の採点＋判定（§11） | 1 |
+| `selected_plan.json` | 採用案・理由・タイトル候補・ターゲット・比較対象（§44） | 1 |
+| `sources.json` | 使用ソース一覧 | 1 |
+| `script.json` | §17構成の台本（Opening→…→結論） | 2 |
+| `script_tts.json` | TTS用の音声ユニット（§8: speed/pause/emphasis…） | 2 |
+| `beginner_qa.json` | 初心者QA（§20: 用語/一文長/料金/結論… 0-100, <80再生成） | 2 |
+| `fact_qa.json` | ファクトQA（各claimの根拠照合, 無根拠断定をflag） | 2 |
 
 日付を固定したい場合: `--date 2026-07-21`。
 
@@ -83,6 +96,7 @@ ai_navigator/
 ├── llm/                     # LLMProvider抽象 + mock/anthropic/openai
 ├── research/                # Researcher(§12) / FactChecker(§13) / BeginnerTranslator(§19)
 ├── planner/                 # IdeaGenerator(§9) / Critic(§10) / Scorer(§11) / Judge(§11)
+├── script/                  # ScriptWriter(§17) / TTSFormatter(§8) / BeginnerQA(§20) / FactQA(§13)
 └── database/                # AI Tool Database(§14)
 config/default.toml          # 配点・閾値・プロバイダ設定
 data/tools/*.json            # ツールDBのseed（mockの知識源）
@@ -107,16 +121,32 @@ tests/                       # Phase 1 テスト
 ## テスト
 
 ```bash
-python tests/test_planning.py     # pytestなしで実行可能
+python tests/test_planning.py     # Phase 1（pytestなしで実行可能）
+python tests/test_script.py       # Phase 2
 # または pytest を入れて: pytest -q
 ```
 
 ---
 
+## Phase 2: Script System（§17/§8/§20/§13）
+
+`run` は企画で採用された案を台本化します。QAは**ルールベース（純コード）**で、mock/実LLMのどちらでも本物の検査が効きます。
+
+```
+selected_plan + research → ScriptWriter(§17) → TTSFormatter(§8) → BeginnerQA(§20) → FactQA(§13/§17)
+                                 ▲                                       │ <80点なら
+                                 └──────────── 再生成ループ ──────────────┘
+```
+
+- **ScriptWriter**: §17構成（Opening≤15sで一部先出し→…→必ず結論）。`用途によります`等の濁した結論は禁止（§18）。emit した専門用語には§19の平易な説明を自動付与。
+- **TTSFormatter**: 台本をそのまま読まず、文単位の音声ユニットに整形（§8）。ツール名・専門用語を強調、場面転換で長めのポーズ。
+- **BeginnerQA**: 用語説明/一文長/具体例/料金/使い始め方/結論明確 を採点（0-100）。80未満は再生成（最大3回）。
+- **FactQA**: `is_claim` の行を research/ツールDBと照合し、根拠不明の断定を flag（§17「公式確認なしの断定」禁止）。
+
 ## ロードマップ
 
-- **Phase 1（本実装）**: Research + Planner ✅
-- Phase 2: Script System（初心者向け台本 / TTS整形 / Beginner QA）
+- **Phase 1**: Research + Planner ✅
+- **Phase 2**: Script System（台本 / TTS整形 / Beginner QA / Fact QA）✅
 - Phase 3: Voice + Storyboard（VOICEVOX / 字幕タイムコード / Scene分割）
 - Phase 4: 動画生成（Remotion / FFmpeg）
 - Phase 5: Browser Capture（Playwright 実操作録画）

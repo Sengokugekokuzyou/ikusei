@@ -72,6 +72,8 @@ class MockProvider(LLMProvider):
             return self._critique(ctx)
         if task == "score":
             return self._score(ctx)
+        if task == "script":
+            return self._script(ctx)
         raise ValueError(f"MockProvider has no route for task={task!r}")
 
     # --- helpers -----------------------------------------------------------
@@ -258,3 +260,90 @@ class MockProvider(LLMProvider):
             else "単独解説のため比較需要は低め。実用性で評価。"
         )
         return {"breakdown": breakdown, "rationale": rationale}
+
+    def _script(self, ctx: dict[str, Any]) -> dict[str, Any]:
+        plan = ctx.get("plan", {})
+        targets = plan.get("comparison_targets", []) or self._tools(ctx)
+        a = targets[0] if targets else plan.get("working_title", "このAI")
+        b = targets[1] if len(targets) >= 2 else ""
+        rec_a = self._tool_record(a)
+        rec_b = self._tool_record(b) if b else {}
+
+        def line(text: str, claim: bool = False) -> dict[str, Any]:
+            return {"text": text, "jargon": [], "is_claim": claim}
+
+        def price_phrase(rec: dict[str, Any], name: str) -> str:
+            p = rec.get("pricing", {})
+            if p.get("free_tier") is True:
+                return f"{name}には無料で試せる範囲があります。"
+            if p.get("free_tier") is False:
+                return f"{name}は無料枠がなく、使うには費用がかかります。"
+            return f"{name}の料金は公式で最新を確認してください。"
+
+        sections: list[dict[str, Any]] = []
+
+        # Opening (<=15s): partial spoiler of the conclusion (§17).
+        if b:
+            sections.append({"section": "opening", "lines": [
+                line(f"{a}と{b}、名前は聞くけど何が違うのか分かりにくいですよね。"),
+                line("結論から少しだけ。じっくり自分で操作したい人と、サッと任せたい人で選ぶAIが変わります。"),
+                line("この動画を見れば、あなたがどっちを使えばいいか分かります。"),
+            ]})
+        else:
+            sections.append({"section": "opening", "lines": [
+                line(f"{a}、名前だけ聞くとちょっと難しそうですよね。"),
+                line("でも、どんな人に向いているAIなのかは意外とシンプルです。"),
+            ]})
+
+        # Beginner explanation (jargon term included so the translator can flag it).
+        sections.append({"section": "beginner_explanation", "lines": [
+            line(f"どちらも「コーディングエージェント」と呼ばれるAIです。", claim=True),
+            line("むずかしく言うと、コードを書く作業を手伝ってくれるAIのことです。"),
+        ]})
+
+        # What can it do (from strengths).
+        wcd = [line(f"{a}は、こんなことが得意です。")]
+        for s in (rec_a.get("strengths", []) or ["幅広い作業を手伝える"])[:3]:
+            wcd.append(line(f"・{s}。", claim=True))
+        sections.append({"section": "what_can_it_do", "lines": wcd})
+
+        # Real demo (placeholder — real capture arrives in Phase 5).
+        sections.append({"section": "real_demo", "lines": [
+            line("ここからは実際の画面で見ていきましょう。"),
+            line("（実演パートは実操作の録画に差し替えます）"),
+        ]})
+
+        # Comparison.
+        if b:
+            comp = [line(f"{a}と{b}の一番の違いはここです。")]
+            sa = (rec_a.get("strengths") or [""])[0]
+            sb = (rec_b.get("strengths") or [""])[0]
+            if sa:
+                comp.append(line(f"{a}は{sa}のが強みです。", claim=True))
+            if sb:
+                comp.append(line(f"{b}は{sb}のが強みです。", claim=True))
+            sections.append({"section": "comparison", "lines": comp})
+
+        # Recommended / not recommended (from best_for / not_for).
+        rec_lines = [line("こんな人に向いています。")]
+        for t in (rec_a.get("best_for", []) or ["まず何か作ってみたい人"])[:2]:
+            rec_lines.append(line(f"・{t}。"))
+        sections.append({"section": "recommended_for", "lines": rec_lines})
+
+        not_lines = [line("逆に、こんな人には向きません。")]
+        for t in (rec_a.get("not_for", []) or ["一切コードに触れたくない人"])[:2]:
+            not_lines.append(line(f"・{t}。"))
+        sections.append({"section": "not_recommended_for", "lines": not_lines})
+
+        # Final decision — type-based, never "用途による" (§18). Include price + next step.
+        final = []
+        if b:
+            final.append(line(f"まとめます。じっくり自分で操作したい人は{a}。"))
+            final.append(line(f"サッと任せて素早く作りたい人は{b}。"))
+        else:
+            final.append(line(f"まとめると、{a}は「自分で作ってみたい人」に向いています。"))
+        final.append(line(price_phrase(rec_a, a), claim=True))
+        final.append(line(f"まずは{a}の公式サイトを開いて、無料でできる範囲から触ってみましょう。"))
+        sections.append({"section": "final_decision", "lines": final})
+
+        return {"sections": sections}
