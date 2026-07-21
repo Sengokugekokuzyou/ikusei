@@ -26,20 +26,24 @@ _SUB_STYLE = (
 
 
 def _motion_vf(index: int, dur: float, fps: int) -> str:
-    """A Ken Burns expression that varies by scene so nothing is static (§23)."""
+    """A smooth Ken Burns expression that varies by scene (§23/§58).
+
+    Smoothness keys: (1) oversample the source well above the output so each
+    integer-pixel crop step is sub-pixel at 1280×720; (2) keep the zoom slow and
+    gentle. At 2560px oversampling + small increments the judder is gone.
+    """
     n = max(2, int(round(dur * fps)))
-    # Frames are rendered tall+uncropped; take the top W×H, then a light upscale
-    # for smoother zoom. Keep the upscale modest to stay fast.
-    base = f"crop={W}:{H}:0:0,scale=1920:1080,"
+    # Frames are rendered tall+uncropped; take the top W×H, then oversample.
+    base = f"crop={W}:{H}:0:0,scale=2560:1440,"
     mode = index % 3
-    if mode == 0:  # slow zoom in
-        z = "min(zoom+0.0007,1.12)"
+    if mode == 0:  # slow, gentle zoom in (~1.0 -> up to 1.06)
+        z = "min(zoom+0.0004,1.06)"
         x, y = "iw/2-(iw/zoom/2)", "ih/2-(ih/zoom/2)"
     elif mode == 1:  # slow zoom out
-        z = "max(1.12-0.0007*on,1.0)"
+        z = "max(1.06-0.0004*on,1.0)"
         x, y = "iw/2-(iw/zoom/2)", "ih/2-(ih/zoom/2)"
-    else:  # gentle pan
-        z = "1.08"
+    else:  # gentle horizontal pan at a mild fixed zoom
+        z = "1.05"
         x, y = f"(iw-iw/zoom)*on/{n}", "ih/2-(ih/zoom/2)"
     return (f"{base}zoompan=z='{z}':x='{x}':y='{y}':d={n}:s={W}x{H}:fps={fps},"
             f"format=yuv420p")

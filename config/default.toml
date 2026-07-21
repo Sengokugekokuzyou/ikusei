@@ -52,8 +52,9 @@ sample_rate = 24000
 # VOICEVOX engine endpoint (only used by the voicevox adapter).
 # Overridable via the VOICEVOX_ENDPOINT env var.
 endpoint = "http://127.0.0.1:50021"
-# VOICEVOX speaker/style id (e.g. 3 = ずんだもん ノーマル). See /speakers on the engine.
-speaker = 3
+# VOICEVOX speaker/style id. 13 = 青山龍星 ノーマル(落ち着いた男性), 3 = ずんだもん.
+# See the full list with: python -m ai_navigator speakers  (engine running)
+speaker = 13
 
 [image]
 # Free-first strategy: rely on Remotion motion graphics (§70 priority 3) and

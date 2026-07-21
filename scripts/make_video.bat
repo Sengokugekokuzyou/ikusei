@@ -8,6 +8,11 @@ set PYTHONIOENCODING=utf-8
 setlocal EnableDelayedExpansion
 cd /d "%~dp0.."
 
+rem ==== VOICE ====  Change this number to pick the VOICEVOX voice.
+rem   13 = 青山龍星 (ノーマル)   3 = ずんだもん (ノーマル)
+rem   To see all ids: py -m ai_navigator speakers  (with VOICEVOX running)
+set "SPEAKER=13"
+
 echo ============================================
 echo    AI Navigator - make video (Windows)
 echo ============================================
@@ -40,7 +45,7 @@ echo.
 
 echo [3/3] Generating... this takes a few minutes. Do NOT close this window.
 echo.
-%PY% -m ai_navigator run --topic "!TOPIC!" --video --voicevox --speaker 3 --open
+%PY% -m ai_navigator run --topic "!TOPIC!" --video --voicevox --speaker !SPEAKER! --open
 
 echo.
 echo ============================================
