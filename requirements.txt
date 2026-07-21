@@ -1,0 +1,17 @@
+# Phase 1 runs on the Python 3.11 standard library alone — no install required
+# to use the MockProvider and the full plan pipeline.
+#
+# Install these only when you switch providers.text away from "mock":
+#   anthropic>=0.40      # AnthropicProvider (text/reasoning)
+#   openai>=1.40         # OpenAIProvider (text + later image generation)
+#
+# Phase 4 video rendering (free, provides a full ffmpeg binary):
+#   imageio-ffmpeg>=0.5  # H.264/AAC/subtitles ffmpeg for `ai_navigator video`
+#
+# Phase 5 browser capture (free; uses the system/bundled Chromium):
+#   playwright>=1.40      # `ai_navigator capture` screen recording
+#
+# Thumbnails and video frames use the system/bundled Chromium — no pip needed.
+#
+# Dev / test (optional):
+#   pytest>=8.0

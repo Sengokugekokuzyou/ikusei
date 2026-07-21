@@ -1,0 +1,30 @@
+{
+  "tool": "Claude Code",
+  "category": "coding_agent",
+  "updated_at": "2026-07-21",
+  "pricing": {
+    "free_tier": false,
+    "paid_plans": ["Claude subscription", "API usage-based"],
+    "notes": "Seed placeholder — re-verify against official pricing before publishing."
+  },
+  "strengths": [
+    "ターミナルやエディタから直接コードベースを操作できる",
+    "既存プロジェクトの文脈理解が得意",
+    "複数ステップの作業を自律的に進められる"
+  ],
+  "weaknesses": [
+    "コマンドライン中心で初心者にはとっつきにくい",
+    "無料枠がなく費用がかかる"
+  ],
+  "best_for": [
+    "既存コードベースの改修を任せたい人",
+    "ターミナル操作に抵抗がない人"
+  ],
+  "not_for": [
+    "コードを一切書かない人",
+    "まず無料で試したい人"
+  ],
+  "official_sources": [
+    "https://docs.anthropic.com/en/docs/claude-code"
+  ]
+}

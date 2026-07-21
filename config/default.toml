@@ -1,0 +1,92 @@
+# AI Navigator — default configuration (Phase 1)
+# TOML is read by the stdlib `tomllib` (Python 3.11+). No dependency needed.
+
+[project]
+channel_name = "AI Navigator"
+language = "ja"
+
+[providers]
+# Which LLM backend each family of tasks uses.
+# One of: "mock" | "anthropic" | "openai".
+# "mock" is deterministic and needs no API key — use it to verify structure.
+text = "mock"
+# `image` is declared for later phases; Phase 1 never calls it.
+image = "openai"
+
+[providers.models]
+anthropic = "claude-opus-4-8"
+openai = "gpt-4o"
+
+[planner]
+# Spec §9: at least 10 ideas per topic.
+ideas_per_topic = 10
+# Spec §10: at least 5 weaknesses per idea from the Critic.
+min_weaknesses_per_idea = 5
+
+# Spec §11: 100-point scoring weights. Must sum to 100.
+[planner.score_weights]
+beginner_value = 25   # 初心者価値
+practicality = 20     # 実用性
+search_demand = 15    # 検索需要
+topicality = 10       # 話題性
+comparison_need = 10  # 比較需要
+video_appeal = 10     # 動画映え
+differentiation = 5   # 差別化
+info_reliability = 5  # 情報信頼性
+
+# Spec §11: Judge thresholds.
+[planner.judge]
+video_min = 80    # >= 80  -> full video candidate
+shorts_min = 65   # 65..79 -> Shorts candidate
+# <= 64 -> discard
+
+[fact_check]
+# Spec §13: fail the plan if fact confidence is below this.
+min_fact_score = 95
+
+[voice]
+# Spec §7: "mock" writes silent placeholder WAVs (no engine needed);
+# "voicevox" talks to a running VOICEVOX engine for real narration.
+adapter = "mock"
+sample_rate = 24000
+# VOICEVOX engine endpoint (only used by the voicevox adapter).
+# Overridable via the VOICEVOX_ENDPOINT env var.
+endpoint = "http://127.0.0.1:50021"
+# VOICEVOX speaker/style id. 2 = 四国めたん ノーマル(聞きやすい定番),
+# 13 = 青山龍星(落ち着いた男性), 3 = ずんだもん.
+# 声を聞き比べる: python -m ai_navigator voice-sample   (エンジン起動中)
+speaker = 2
+
+[image]
+# Real photos for B-roll/background scenes (§48). Providers:
+#   "none"      : no fetching (local assets/ overrides still work)
+#   "openverse" : keyless CC images (attribution auto-collected into credits.txt)
+#   "pixabay"   : free, commercial-safe, no attribution (needs PIXABAY_API_KEY)
+# NEVER used to fake a real product UI (§49). Official screens: drop real files
+# into assets/scene_<id>.jpg (+ scene_<id>.txt for the 出典 caption).
+# Default "openverse": keyless, so the double-click flow gets real B-roll with no
+# setup. For faster/higher-quality photos, set "pixabay" + PIXABAY_API_KEY.
+provider = "openverse"
+assets_dir = "assets"
+
+[thumbnail]
+# Thumbnails are composed in HTML and rendered to PNG by headless Chromium —
+# free and key-less (§54/§61). No image-generation API needed.
+renderer = "chromium"
+# Leave blank to auto-detect the bundled Chromium; or set an explicit path.
+chrome_path = ""
+# Spec §64/§69: generate at least 3 candidates.
+candidates = 3
+
+[video]
+# Phase 4 renders an mp4 from the storyboard frames + narration + subtitles
+# using a full ffmpeg. `pip install imageio-ffmpeg` provides one for free.
+fps = 30
+# Ken Burns camera motion so nothing is fully static (§23/§58).
+motion = true
+# Leave blank to auto-detect ffmpeg (imageio-ffmpeg, then PATH).
+ffmpeg_path = ""
+
+[paths]
+reports_dir = "reports"
+tools_db_dir = "data/tools"
