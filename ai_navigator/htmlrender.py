@@ -9,6 +9,7 @@ rendering into a taller window and cropping to the exact target size
 from __future__ import annotations
 
 import glob
+import os
 import shutil
 import struct
 import subprocess
@@ -19,21 +20,50 @@ from pathlib import Path
 _RENDER_MARGIN = 220
 
 
+def _windows_browser_paths() -> list[str]:
+    """Common Chrome/Edge install locations on Windows.
+
+    Edge (Chromium-based, supports --headless=new --screenshot) ships with every
+    Windows 10/11, so it's a reliable fallback when Chrome isn't installed.
+    """
+    roots = [
+        os.environ.get("PROGRAMFILES", r"C:\Program Files"),
+        os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)"),
+        os.environ.get("LOCALAPPDATA", ""),
+    ]
+    rels = [
+        r"Google\Chrome\Application\chrome.exe",
+        r"Microsoft\Edge\Application\msedge.exe",
+    ]
+    out = []
+    for root in roots:
+        if not root:
+            continue
+        for rel in rels:
+            out.append(os.path.join(root, rel))
+    return out
+
+
 def find_chrome(override: str = "") -> str | None:
     if override and Path(override).exists():
         return override
-    patterns = [
+    # Linux: the pre-installed Playwright Chromium.
+    for pat in (
         "/opt/pw-browsers/chromium-*/chrome-linux/chrome",
         "/opt/pw-browsers/chromium_headless_shell-*/chrome-linux/headless_shell",
-    ]
-    for pat in patterns:
+    ):
         hits = sorted(glob.glob(pat))
         if hits:
             return hits[-1]
-    for name in ("chromium", "chromium-browser", "google-chrome", "chrome"):
+    # On PATH (Linux/mac; also Windows if added).
+    for name in ("chromium", "chromium-browser", "google-chrome", "chrome", "msedge"):
         found = shutil.which(name)
         if found:
             return found
+    # Windows default install locations (Chrome, then Edge).
+    for path in _windows_browser_paths():
+        if os.path.exists(path):
+            return path
     return None
 
 
@@ -147,8 +177,9 @@ def render_html_to_png(
         chrome, "--headless=new", "--no-sandbox", "--disable-gpu",
         "--hide-scrollbars", "--force-device-scale-factor=1",
         f"--window-size={width},{height + _RENDER_MARGIN}",
-        # Absolute file:// URL — a relative path renders Chrome's error page.
-        f"--screenshot={out_path}", f"file://{html_path}",
+        # Use as_uri() so the file:// URL is valid on Windows (file:///C:/...)
+        # as well as POSIX; a bare path renders Chrome's error page.
+        f"--screenshot={out_path}", html_path.as_uri(),
     ]
     subprocess.run(cmd, capture_output=True, timeout=60)
     html_path.unlink(missing_ok=True)
