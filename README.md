@@ -52,6 +52,7 @@ Compare   : Claude Code vs Codex
 | `voice.json` + `voice/*.wav` | 音声合成マニフェスト＋クリップ（§7/§8、mockは無音WAV） | 3 |
 | `storyboard.json` | 絵コンテ（§21-24: Scene/visual_type/component/camera/params） | 3 |
 | `subtitles.json` + `captions.srt` | 字幕トラック（§28、音声タイミングに整合） | 3 |
+| `thumbnails.json` + `thumbnails/*.png` | サムネ候補3案＋選定（§61-64、Chromiumで1280×720生成） | 画像 |
 
 日付を固定したい場合: `--date 2026-07-21`。
 
@@ -102,6 +103,7 @@ ai_navigator/
 ├── script/                  # ScriptWriter(§17) / TTSFormatter(§8) / BeginnerQA(§20) / FactQA(§13)
 ├── voice/                   # VoiceAdapter(§7: mock/voicevox) / VoiceSynthesizer(§8)
 ├── storyboard/              # StoryboardBuilder(§21-24) / SubtitleBuilder(§28)
+├── thumbnail/               # ThumbnailDirector(§62) / ChromiumRenderer(§54,61) / Judge(§64)
 └── database/                # AI Tool Database(§14)
 config/default.toml          # 配点・閾値・プロバイダ設定
 data/tools/*.json            # ツールDBのseed（mockの知識源）
@@ -129,6 +131,7 @@ tests/                       # Phase 1 テスト
 python tests/test_planning.py     # Phase 1（pytestなしで実行可能）
 python tests/test_script.py       # Phase 2
 python tests/test_media.py        # Phase 3
+python tests/test_thumbnail.py    # サムネイル
 # または pytest を入れて: pytest -q
 ```
 
@@ -158,6 +161,15 @@ selected_plan + research → ScriptWriter(§17) → TTSFormatter(§8) → Beginn
 - **SubtitleBuilder**: 音声タイミングに整合した字幕を生成（重要語をemphasisで保持、§28）。SRTも出力。
 
 > mockは実操作映像を持たないため、§22の「実操作35〜45%」は必ず未達警告になります（正しい挙動）。実収録は Phase 5（Playwright）で補います。
+
+## サムネイル & 画像（無料方針）
+
+有料のOpenAI画像生成（§46-73）は使わず、**¥0・APIキー不要**で回します。仕様 §70 では生成画像は優先度4番目で、上位（実収録＋Remotionモーション）で代替できるためです。
+
+- **サムネイル（§61-64）**: HTML/CSSで組み、**同梱のChromiumで1280×720 PNGに書き出し**。§54「文字は焼き込まず後載せ」に一致し、日本語（IPAGothic）も正確。ディレクター（§62）が最低3案を生成、ルールベースのJudge（§64）が選定。
+- **B-roll / コンセプト図（§48）**: 既定は **Remotionモーション**で表現（`image.provider = "none"`）。任意で無料ストックAPI（stock）やローカルStable Diffusion（local_sd）を後付け可能。`openai`は有料オプションとして残置。
+
+`config` は `[image] provider = "none"` / `[thumbnail] renderer = "chromium"`。Chromiumは自動検出（`thumbnail.chrome_path`で明示も可）。
 
 ## ロードマップ
 

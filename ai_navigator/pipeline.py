@@ -28,6 +28,7 @@ from .research import BeginnerTranslator, FactChecker, Researcher, extract_tools
 from .script import BeginnerQA, FactQA, ScriptWriter, TTSFormatter
 from .storyboard import StoryboardBuilder, SubtitleBuilder, to_srt
 from .voice import VoiceSynthesizer, build_adapter
+from .thumbnail import ChromiumThumbnailRenderer, ThumbnailDirector, ThumbnailJudge
 from .schemas import (
     BeginnerQAReport,
     FactQAReport,
@@ -36,6 +37,8 @@ from .schemas import (
     Script,
     SelectedPlan,
     Storyboard,
+    ThumbnailCandidate,
+    ThumbnailSet,
     Verdict,
     to_json,
 )
@@ -138,9 +141,32 @@ class PlanPipeline:
         subtitles = SubtitleBuilder().run(tts, voice)
         return voice, storyboard, subtitles
 
+    # --- Thumbnails (§61-64) — free HTML→Chromium rendering ---------------
+    def build_thumbnails(self, plan: SelectedPlan, out_dir: Path) -> ThumbnailSet:
+        director = ThumbnailDirector()
+        judge = ThumbnailJudge()
+        renderer = ChromiumThumbnailRenderer(self._cfg.get("thumbnail.chrome_path", ""))
+        n = self._cfg.get("thumbnail.candidates", 3)
+        specs = director.run(plan)[:max(3, n)]
+        result = ThumbnailSet(topic=plan.topic, produced_at=plan.produced_at, renderer="chromium")
+        if not renderer.available:
+            result.warnings.append(
+                "Chromiumが見つからずサムネ未生成。thumbnail.chrome_path を設定してください。"
+            )
+            result.candidates = [ThumbnailCandidate(spec=s) for s in specs]
+            return result
+        for spec in specs:
+            rel = f"thumbnails/thumb_{spec.label}.png"
+            w, h = renderer.render(spec, out_dir / rel)
+            result.candidates.append(
+                ThumbnailCandidate(spec=spec, image_path=rel, width=w, height=h)
+            )
+        result.chosen_label = judge.judge(result.candidates)
+        return result
+
     def run_script_from_dir(
         self, report_dir: Path
-    ) -> tuple[Script, BeginnerQAReport, FactQAReport, Storyboard]:
+    ) -> tuple[Script, BeginnerQAReport, FactQAReport, Storyboard, ThumbnailSet]:
         plan = _load_plan(report_dir / "selected_plan.json")
         research = _load_research(report_dir / "research.json")
         script, bqa, fqa, tts = self.build_script(plan, research)
@@ -155,7 +181,11 @@ class PlanPipeline:
         self._write(report_dir / "storyboard.json", storyboard)
         self._write(report_dir / "subtitles.json", subtitles)
         (report_dir / "captions.srt").write_text(to_srt(subtitles), encoding="utf-8")
-        return script, bqa, fqa, storyboard
+
+        # Thumbnails (free, Chromium-rendered).
+        thumbnails = self.build_thumbnails(plan, report_dir)
+        self._write(report_dir / "thumbnails.json", thumbnails)
+        return script, bqa, fqa, storyboard, thumbnails
 
     @staticmethod
     def _write(path: Path, obj) -> None:

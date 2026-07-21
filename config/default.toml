@@ -53,6 +53,21 @@ sample_rate = 24000
 # Overridable via the VOICEVOX_ENDPOINT env var.
 endpoint = "http://127.0.0.1:50021"
 
+[image]
+# Free-first strategy: rely on Remotion motion graphics (§70 priority 3) and
+# real captures (Phase 5). Generated images are OFF by default.
+# "none" | "stock" | "local_sd" | "openai" (last two/paid are optional add-ons).
+provider = "none"
+
+[thumbnail]
+# Thumbnails are composed in HTML and rendered to PNG by headless Chromium —
+# free and key-less (§54/§61). No image-generation API needed.
+renderer = "chromium"
+# Leave blank to auto-detect the bundled Chromium; or set an explicit path.
+chrome_path = ""
+# Spec §64/§69: generate at least 3 candidates.
+candidates = 3
+
 [paths]
 reports_dir = "reports"
 tools_db_dir = "data/tools"

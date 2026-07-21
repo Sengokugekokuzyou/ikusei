@@ -45,6 +45,19 @@ def _cmd_plan(args: argparse.Namespace) -> int:
     return 0
 
 
+def _print_thumbnail_result(thumbs) -> None:
+    print("-" * 48)
+    if thumbs.warnings:
+        for w in thumbs.warnings:
+            print(f"🖼️  ⚠️  {w}")
+        return
+    print(f"🖼️  Thumbnails : {len(thumbs.candidates)} candidates (chosen: {thumbs.chosen_label})")
+    for c in thumbs.candidates:
+        mark = "★" if c.spec.label == thumbs.chosen_label else " "
+        note = f" — {', '.join(c.notes)}" if c.notes else ""
+        print(f"  {mark} {c.spec.label}: 「{c.spec.text}」 {c.width}x{c.height} score={c.score}{note}")
+
+
 def _print_script_result(bqa, fqa, storyboard, out_dir: Path) -> None:
     print("-" * 48)
     b = "✅" if bqa.passed else "🛑"
@@ -73,9 +86,10 @@ def _cmd_script(args: argparse.Namespace) -> int:
         print(f"error: {report_dir}/selected_plan.json not found. Run `plan` first.", file=sys.stderr)
         return 2
     pipeline = PlanPipeline(cfg)
-    _script, bqa, fqa, storyboard = pipeline.run_script_from_dir(report_dir)
+    _script, bqa, fqa, storyboard, thumbs = pipeline.run_script_from_dir(report_dir)
     print(f"Report dir : {report_dir}")
     _print_script_result(bqa, fqa, storyboard, report_dir)
+    _print_thumbnail_result(thumbs)
     return 0
 
 
@@ -88,8 +102,9 @@ def _cmd_run(args: argparse.Namespace) -> int:
     _cmd_plan_print(plan, out_dir, cfg)
     if not plan.produce:
         return 0
-    _script, bqa, fqa, storyboard = pipeline.run_script_from_dir(out_dir)
+    _script, bqa, fqa, storyboard, thumbs = pipeline.run_script_from_dir(out_dir)
     _print_script_result(bqa, fqa, storyboard, out_dir)
+    _print_thumbnail_result(thumbs)
     return 0
 
 

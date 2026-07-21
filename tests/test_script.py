@@ -31,7 +31,7 @@ def _make_pipeline_and_plan():
 def test_script_pipeline_passes_qa():
     pipeline, plan, _, out_dir = _make_pipeline_and_plan()
     # Load research back from disk (has findings) like the CLI does.
-    _script, bqa, fqa, _storyboard = pipeline.run_script_from_dir(out_dir)
+    _script, bqa, fqa, _storyboard, _thumbs = pipeline.run_script_from_dir(out_dir)
     assert bqa.passed, f"beginner QA failed: {bqa.score} {[i.detail for i in bqa.issues]}"
     assert fqa.passed, f"fact QA failed: {fqa.score} {[i.detail for i in fqa.issues]}"
     # §17: final decision must exist and be non-empty.

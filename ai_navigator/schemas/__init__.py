@@ -61,6 +61,7 @@ from .storyboard import (  # noqa: E402
     Subtitle,
     SubtitleTrack,
 )
+from .thumbnail import ThumbnailSpec, ThumbnailCandidate, ThumbnailSet  # noqa: E402
 
 __all__ = [
     "to_dict",
@@ -98,4 +99,7 @@ __all__ = [
     "Storyboard",
     "Subtitle",
     "SubtitleTrack",
+    "ThumbnailSpec",
+    "ThumbnailCandidate",
+    "ThumbnailSet",
 ]
