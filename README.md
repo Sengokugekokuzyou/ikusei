@@ -189,7 +189,17 @@ python -m ai_navigator video --plan reports/2026-07-21_.../
 `--endpoint http://HOST:50021` で別ホストのエンジンも指定可。config で恒久設定するなら
 `[voice] adapter = "voicevox"` / `speaker = N`。
 
+**企画から声つき動画まで一括**（VOICEVOX起動中）:
+```bash
+python -m ai_navigator run --topic "Claude Code vs Codex" --video --voicevox --speaker 3 --open
+```
+VOICEVOXに繋がらない場合は自動で無音(mock)にフォールバックして続行します。
+
 > **VOICEVOX を動かすマシンと同じ場所でこのコマンドを実行してください。** 別マシン（例：ホスト型セッション）からローカルの `:50021` には到達できません。
+
+### Windows でコマンドが苦手な方へ
+
+**ダブルクリックだけ**で作れます → **[docs/windows-quickstart.md](docs/windows-quickstart.md)**（Python導入〜`scripts/make_video.bat` ダブルクリックまで、画像なしの手順）。
 
 > **このリポジトリのホスト実行環境（Claude Code on the web）では実音声を生成できません。** egressポリシーが許可するのはパッケージレジストリ（PyPI/npm等）のみで、VOICEVOXエンジン/Dockerイメージ/各種TTS辞書の配信元（GitHub・Docker Hub 等）は403で拒否されます。**ローカルPC等、上記が取得できる環境で上記手順を実行すれば実音声になります**（アダプタは実装・配線済み）。
 - **StoryboardBuilder**: 台本1行=1Sceneで、§25コンポーネント（VSComparison/FeatureList/ProsConsCard…）と§60カメラプリセット（cinematic_zoom/parallax_soft…）を割り当て。完全静止を作らない（§23）。§22の映像比率を自己申告し、実操作映像が目標未満なら警告。

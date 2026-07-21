@@ -202,9 +202,39 @@ def _cmd_video(args: argparse.Namespace) -> int:
     return 0 if video.ok else 1
 
 
+def _open_file(path: Path) -> None:
+    import os
+    import subprocess
+    try:
+        if sys.platform.startswith("win"):
+            os.startfile(str(path))  # type: ignore[attr-defined]
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", str(path)])
+        else:
+            subprocess.Popen(["xdg-open", str(path)])
+    except Exception:
+        pass  # opening is a convenience; never fail the run over it
+
+
 def _cmd_run(args: argparse.Namespace) -> int:
-    """plan -> (if produce) script, and optionally video, end to end."""
+    """plan -> (if produce) script, and optionally VOICEVOX audio + video."""
     cfg = load_config()
+    # Real VOICEVOX narration for the whole run (validated up front).
+    if getattr(args, "voicevox", False):
+        cfg.set("voice.adapter", "voicevox")
+        if args.endpoint:
+            cfg.set("voice.endpoint", args.endpoint)
+        if args.speaker is not None:
+            cfg.set("voice.speaker", args.speaker)
+        try:
+            from .voice import build_adapter
+            build_adapter("voicevox", endpoint=cfg.get("voice.endpoint", ""),
+                          speaker=cfg.get("voice.speaker", 3))  # pings /version
+            print("🔊 VOICEVOX 接続OK — 実音声で生成します。")
+        except Exception as exc:
+            print(f"🔊 ⚠️  VOICEVOXに接続できず、無音(mock)で続行します:\n   {exc}", file=sys.stderr)
+            cfg.set("voice.adapter", "mock")
+
     on_date = date.fromisoformat(args.date) if args.date else None
     pipeline = PlanPipeline(cfg)
     plan, out_dir = pipeline.run(args.topic, on_date=on_date)
@@ -217,6 +247,8 @@ def _cmd_run(args: argparse.Namespace) -> int:
     if getattr(args, "video", False):
         video = pipeline.build_video_from_dir(out_dir)
         _print_video_result(video, out_dir)
+        if getattr(args, "open", False) and video.ok:
+            _open_file(out_dir / video.path)
     return 0
 
 
@@ -253,10 +285,14 @@ def build_parser() -> argparse.ArgumentParser:
     script.add_argument("--plan", required=True, help="reports/YYYY-MM-DD_<slug>/ directory")
     script.set_defaults(func=_cmd_script)
 
-    run = sub.add_parser("run", help="plan -> script (+ --video), end to end")
+    run = sub.add_parser("run", help="plan -> script (+ --voicevox / --video), end to end")
     run.add_argument("--topic", required=True, help='e.g. "Claude Code vs Codex"')
     run.add_argument("--date", default=None, help="Override production date (YYYY-MM-DD)")
     run.add_argument("--video", action="store_true", help="Also render the mp4 (Phase 4)")
+    run.add_argument("--voicevox", action="store_true", help="Use a running VOICEVOX engine for real audio")
+    run.add_argument("--speaker", type=int, default=None, help="VOICEVOX speaker/style id (with --voicevox)")
+    run.add_argument("--endpoint", default=None, help="VOICEVOX endpoint URL (with --voicevox)")
+    run.add_argument("--open", action="store_true", help="Open the finished mp4 when done")
     run.set_defaults(func=_cmd_run)
 
     voice = sub.add_parser("voice", help="(Re)synthesize narration for a dir with the configured adapter")
