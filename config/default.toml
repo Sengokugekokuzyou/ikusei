@@ -46,12 +46,14 @@ min_fact_score = 95
 
 [voice]
 # Spec §7: "mock" writes silent placeholder WAVs (no engine needed);
-# "voicevox" talks to a running VOICEVOX engine.
+# "voicevox" talks to a running VOICEVOX engine for real narration.
 adapter = "mock"
 sample_rate = 24000
 # VOICEVOX engine endpoint (only used by the voicevox adapter).
 # Overridable via the VOICEVOX_ENDPOINT env var.
 endpoint = "http://127.0.0.1:50021"
+# VOICEVOX speaker/style id (e.g. 3 = ずんだもん ノーマル). See /speakers on the engine.
+speaker = 3
 
 [image]
 # Free-first strategy: rely on Remotion motion graphics (§70 priority 3) and

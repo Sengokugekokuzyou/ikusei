@@ -79,6 +79,19 @@ def test_subtitles_align_to_voice():
         assert abs(sub.end - clip.end) < 1e-6
 
 
+def test_resynth_voice_from_dir():
+    # Full run to disk, then re-synthesize voice (mock) from the saved artifacts.
+    cfg = load_config()
+    pipeline = PlanPipeline(cfg)
+    plan, out_dir = pipeline.run("Claude Code vs Codex", on_date=date(2026, 7, 21))
+    pipeline.run_script_from_dir(out_dir)
+    voice = pipeline.resynth_voice_from_dir(out_dir)
+    assert len(voice.clips) > 0
+    for name in ["voice", "storyboard", "subtitles"]:
+        assert (out_dir / f"{name}.json").exists()
+    assert (out_dir / "captions.srt").exists()
+
+
 def test_srt_format():
     track = SubtitleTrack(topic="t", produced_at="d", subtitles=[
         Subtitle(index=1, start=0.0, end=1.5, text="こんにちは。"),

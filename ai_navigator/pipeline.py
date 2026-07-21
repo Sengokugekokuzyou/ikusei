@@ -35,12 +35,16 @@ from .schemas import (
     FactQAReport,
     Finding,
     ResearchReport,
+    AudioUnit,
     Scene,
     Script,
+    ScriptLine,
+    ScriptSection,
     SelectedPlan,
     Storyboard,
     ThumbnailCandidate,
     ThumbnailSet,
+    TTSScript,
     Verdict,
     VideoResult,
     VoiceClip,
@@ -140,6 +144,7 @@ class PlanPipeline:
             self._cfg.get("voice.adapter", "mock"),
             sample_rate=self._cfg.get("voice.sample_rate", 24000),
             endpoint=os.environ.get("VOICEVOX_ENDPOINT", self._cfg.get("voice.endpoint", "")),
+            speaker=self._cfg.get("voice.speaker", 3),
         )
         voice = VoiceSynthesizer(adapter).run(tts, out_dir)
         storyboard = StoryboardBuilder().run(script, voice)
@@ -182,15 +187,30 @@ class PlanPipeline:
 
         # Phase 3: voice + storyboard + subtitles.
         voice, storyboard, subtitles = self.build_media(script, tts, report_dir)
-        self._write(report_dir / "voice.json", voice)
-        self._write(report_dir / "storyboard.json", storyboard)
-        self._write(report_dir / "subtitles.json", subtitles)
-        (report_dir / "captions.srt").write_text(to_srt(subtitles), encoding="utf-8")
+        self._write_media(report_dir, voice, storyboard, subtitles)
 
         # Thumbnails (free, Chromium-rendered).
         thumbnails = self.build_thumbnails(plan, report_dir)
         self._write(report_dir / "thumbnails.json", thumbnails)
         return script, bqa, fqa, storyboard, thumbnails
+
+    def _write_media(self, report_dir: Path, voice, storyboard, subtitles) -> None:
+        self._write(report_dir / "voice.json", voice)
+        self._write(report_dir / "storyboard.json", storyboard)
+        self._write(report_dir / "subtitles.json", subtitles)
+        (report_dir / "captions.srt").write_text(to_srt(subtitles), encoding="utf-8")
+
+    def resynth_voice_from_dir(self, report_dir: Path) -> VoiceManifest:
+        """Re-synthesize narration with the configured adapter (e.g. voicevox).
+
+        Real engine durations differ from the mock estimate, so the storyboard
+        and subtitles are re-derived from the new timing too.
+        """
+        script = _load_script(report_dir / "script.json")
+        tts = _load_tts(report_dir / "script_tts.json")
+        voice, storyboard, subtitles = self.build_media(script, tts, report_dir)
+        self._write_media(report_dir, voice, storyboard, subtitles)
+        return voice
 
     # --- Phase 4: Video (§4-5) — free FFmpeg render -----------------------
     def build_video_from_dir(self, report_dir: Path) -> VideoResult:
@@ -213,6 +233,43 @@ def _load_plan(path: Path) -> SelectedPlan:
     d = json.loads(path.read_text(encoding="utf-8"))
     d["verdict"] = Verdict(d.get("verdict", "discard"))
     return SelectedPlan(**d)
+
+
+def _load_script(path: Path) -> Script:
+    d = json.loads(path.read_text(encoding="utf-8"))
+    sections = [
+        ScriptSection(
+            section=s.get("section", ""),
+            lines=[
+                ScriptLine(
+                    text=ln.get("text", ""), jargon=list(ln.get("jargon", [])),
+                    is_claim=bool(ln.get("is_claim", False)),
+                )
+                for ln in s.get("lines", [])
+            ],
+        )
+        for s in d.get("sections", [])
+    ]
+    return Script(
+        topic=d.get("topic", ""), produced_at=d.get("produced_at", ""),
+        idea_id=d.get("idea_id", 0), working_title=d.get("working_title", ""),
+        target_viewer=d.get("target_viewer", ""),
+        comparison_targets=list(d.get("comparison_targets", [])), sections=sections,
+    )
+
+
+def _load_tts(path: Path) -> TTSScript:
+    d = json.loads(path.read_text(encoding="utf-8"))
+    units = [
+        AudioUnit(
+            id=u.get("id", 0), section=u.get("section", ""), text=u.get("text", ""),
+            line=u.get("line", 0), speaker=u.get("speaker", "default"),
+            speed=u.get("speed", 1.0), pause_after=u.get("pause_after", 0.3),
+            emotion=u.get("emotion", "friendly"), emphasis=list(u.get("emphasis", [])),
+        )
+        for u in d.get("units", [])
+    ]
+    return TTSScript(topic=d.get("topic", ""), produced_at=d.get("produced_at", ""), units=units)
 
 
 def _load_storyboard(path: Path) -> Storyboard:

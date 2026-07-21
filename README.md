@@ -166,6 +166,23 @@ selected_plan + research → ScriptWriter(§17) → TTSFormatter(§8) → Beginn
 台本を音声タイムラインに載せ、絵コンテと字幕を導出します。LLM層と同じく**アダプタ方式**で、VOICEVOXエンジンが無くても動きます。
 
 - **VoiceSynthesizer**: 各音声ユニットをアダプタで合成し、単一タイムラインに配置（§8のポーズ込み）。`mock`アダプタは推定尺の**無音WAVを実ファイル出力**するのでオフラインで完結、FFmpeg/Remotionの実入力になる。`voicevox`アダプタは稼働中エンジンにHTTP接続（`VOICEVOX_ENDPOINT`）。
+
+### 実音声を出す（VOICEVOX・無料）
+
+`mock` は無音です。実際に喋る動画にするには、無料の VOICEVOX エンジンを起動して切り替えます。
+
+```bash
+# 1) エンジンを起動（Docker。デスクトップアプリでも可、同じAPIを :50021 で提供）
+docker run --rm -p 50021:50021 voicevox/voicevox_engine:cpu-ubuntu20.04-latest
+
+# 2) config/default.toml で voice.adapter = "voicevox"（speaker も選択）
+
+# 3) 既存レポートの音声を実音声に差し替え（尺が変わるので字幕・絵コンテも再タイミング）
+python -m ai_navigator voice  --plan reports/2026-07-21_claude-code-vs-codex/
+python -m ai_navigator video  --plan reports/2026-07-21_claude-code-vs-codex/
+```
+
+> **このリポジトリのホスト実行環境（Claude Code on the web）では実音声を生成できません。** egressポリシーが許可するのはパッケージレジストリ（PyPI/npm等）のみで、VOICEVOXエンジン/Dockerイメージ/各種TTS辞書の配信元（GitHub・Docker Hub 等）は403で拒否されます。**ローカルPC等、上記が取得できる環境で上記手順を実行すれば実音声になります**（アダプタは実装・配線済み）。
 - **StoryboardBuilder**: 台本1行=1Sceneで、§25コンポーネント（VSComparison/FeatureList/ProsConsCard…）と§60カメラプリセット（cinematic_zoom/parallax_soft…）を割り当て。完全静止を作らない（§23）。§22の映像比率を自己申告し、実操作映像が目標未満なら警告。
 - **SubtitleBuilder**: 音声タイミングに整合した字幕を生成（重要語をemphasisで保持、§28）。SRTも出力。
 

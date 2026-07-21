@@ -31,7 +31,9 @@ class VoiceAdapter(ABC):
         """Write audio to out_path and return its duration in seconds."""
 
 
-def build_adapter(name: str, *, sample_rate: int = 24000, endpoint: str = "") -> VoiceAdapter:
+def build_adapter(
+    name: str, *, sample_rate: int = 24000, endpoint: str = "", speaker: int = 3
+) -> VoiceAdapter:
     name = (name or "mock").lower()
     if name == "mock":
         from .mock import MockVoiceAdapter
@@ -40,5 +42,5 @@ def build_adapter(name: str, *, sample_rate: int = 24000, endpoint: str = "") ->
     if name == "voicevox":
         from .voicevox import VoicevoxAdapter
 
-        return VoicevoxAdapter(endpoint=endpoint)
+        return VoicevoxAdapter(endpoint=endpoint, speaker=speaker)
     raise ValueError(f"Unknown voice adapter: {name!r} (expected mock/voicevox)")

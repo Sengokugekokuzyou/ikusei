@@ -112,6 +112,30 @@ def _print_video_result(video, out_dir: Path) -> None:
     print(f"             {out_dir}/{video.path}")
 
 
+def _cmd_voice(args: argparse.Namespace) -> int:
+    cfg = load_config()
+    report_dir = Path(args.plan)
+    if not (report_dir / "script_tts.json").exists():
+        print(f"error: {report_dir}/script_tts.json not found. Run `script` first.", file=sys.stderr)
+        return 2
+    adapter = cfg.get("voice.adapter", "mock")
+    pipeline = PlanPipeline(cfg)
+    try:
+        voice = pipeline.resynth_voice_from_dir(report_dir)
+    except Exception as exc:  # e.g. VoicevoxUnavailable
+        print(f"🔊 音声合成に失敗しました（adapter={adapter}）:\n   {exc}", file=sys.stderr)
+        return 1
+    mm, ss = int(voice.total_duration // 60), int(voice.total_duration % 60)
+    silent = adapter == "mock"
+    print(f"🔊 Voice re-synth : adapter={adapter}  clips={len(voice.clips)}  尺 {mm}:{ss:02d}"
+          + ("  (mockは無音)" if silent else ""))
+    print(f"             {report_dir}/voice/  (+ storyboard/subtitles を再タイミング)")
+    if silent:
+        print("   実音声にするには config の voice.adapter を \"voicevox\" にし、"
+              "エンジン起動後に再実行してください。")
+    return 0
+
+
 def _cmd_video(args: argparse.Namespace) -> int:
     cfg = load_config()
     report_dir = Path(args.plan)
@@ -181,6 +205,10 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--date", default=None, help="Override production date (YYYY-MM-DD)")
     run.add_argument("--video", action="store_true", help="Also render the mp4 (Phase 4)")
     run.set_defaults(func=_cmd_run)
+
+    voice = sub.add_parser("voice", help="(Re)synthesize narration for a dir with the configured adapter")
+    voice.add_argument("--plan", required=True, help="reports/YYYY-MM-DD_<slug>/ directory")
+    voice.set_defaults(func=_cmd_voice)
 
     video = sub.add_parser("video", help="Render the mp4 from an existing script/storyboard dir")
     video.add_argument("--plan", required=True, help="reports/YYYY-MM-DD_<slug>/ directory")
